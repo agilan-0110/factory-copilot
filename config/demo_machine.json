@@ -1,0 +1,21 @@
+{
+  "profile_id": "ai4i-demo-v1",
+  "name": "Benchmark demonstration station",
+  "deployment_status": "Benchmark demonstration only — not validated for physical equipment",
+  "dataset": "AI4I 2020 (dataset integration pending)",
+  "model_id": null,
+  "alert_threshold": null,
+  "language": "English",
+  "technician_contact": null,
+  "messaging_mode": "disabled",
+  "guidance_sources": [],
+  "product_types": ["L", "M", "H"],
+  "input_schema": [
+    {"field": "air_temperature_k", "unit": "K"},
+    {"field": "process_temperature_k", "unit": "K"},
+    {"field": "rotational_speed_rpm", "unit": "rpm"},
+    {"field": "torque_nm", "unit": "N·m"},
+    {"field": "tool_wear_min", "unit": "min"},
+    {"field": "product_type", "unit": "L / M / H"}
+  ]
+}
