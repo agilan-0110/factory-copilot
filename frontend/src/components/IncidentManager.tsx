@@ -13,15 +13,21 @@ import {
   X,
   Smartphone,
   ShieldCheck,
+  Bot,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { Incident, AuditEvent, WhatsAppStatus } from '../types';
 
 interface IncidentManagerProps {
   onRefresh: () => void;
+  onOpenCopilotForIncident?: (incidentId: string) => void;
 }
 
-export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) => {
+export const IncidentManager: React.FC<IncidentManagerProps> = ({ 
+  onRefresh,
+  onOpenCopilotForIncident,
+}) => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [auditTrail, setAuditTrail] = useState<AuditEvent[]>([]);
@@ -248,7 +254,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
               disabled={waTestStatus?.loading}
               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5 transition disabled:opacity-50"
             >
-              <Send className="w-3.5 h-3.5 text-cyan-400" />
+              <Send className="w-3.5 h-3.5 text-blue-400" />
               <span>{waTestStatus?.loading ? 'Sending...' : 'Send Test Ping'}</span>
             </button>
           )}
@@ -326,7 +332,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                   onClick={() => setFilter(f)}
                   className={`px-2.5 py-1 rounded-lg capitalize font-medium transition ${
                     filter === f
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                       : 'bg-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -350,7 +356,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                       onClick={() => selectIncident(inc)}
                       className={`p-3 rounded-lg border cursor-pointer transition text-left space-y-2 ${
                         isSelected
-                          ? 'bg-slate-800/90 border-cyan-500/60 shadow-md'
+                          ? 'bg-slate-800/90 border-blue-500/60 shadow-md'
                           : 'bg-slate-900 hover:bg-slate-800/50 border-slate-800'
                       }`}
                     >
@@ -361,7 +367,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
 
                       <div className="flex items-center justify-between text-xs text-slate-400">
                         <span>Event: <code className="text-slate-300">{inc.event_id}</code></span>
-                        <span className="font-mono text-cyan-400 font-semibold">
+                        <span className="font-mono text-blue-400 font-semibold">
                           {inc.probability !== null && inc.probability !== undefined
                             ? `${(inc.probability * 100).toFixed(1)}%`
                             : 'N/A'}
@@ -406,6 +412,21 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                 </div>
               </div>
 
+              {/* Ask Copilot for this Incident Banner */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/60 border border-slate-700">
+                <div className="flex items-center space-x-2 text-xs text-slate-200">
+                  <Bot className="w-4 h-4 text-blue-400" />
+                  <span>Consult Technical Copilot on Incident {selectedIncident.id}</span>
+                </div>
+                <button
+                  onClick={() => onOpenCopilotForIncident?.(selectedIncident.id)}
+                  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center space-x-1.5 transition shadow-sm"
+                >
+                  <span>Ask Copilot</span>
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                </button>
+              </div>
+
               {/* Action Message Alert */}
               {actionMessage && (
                 <div className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
@@ -433,7 +454,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                     disabled={selectedIncident.status !== 'new'}
                     className="p-2 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-left"
                   >
-                    <span className="font-mono text-cyan-400 font-bold block">[1] Acknowledge</span>
+                    <span className="font-mono text-blue-400 font-bold block">[1] Acknowledge</span>
                     <span className="text-[10px] text-slate-400">Tech on site</span>
                   </button>
 
@@ -479,7 +500,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
               <div className="p-4 rounded-lg bg-slate-800/40 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 text-cyan-400" />
+                    <MessageSquare className="w-4 h-4 text-blue-400" />
                     <span className="text-xs font-semibold text-slate-200">WhatsApp Notification Channel</span>
                   </div>
                   <span className="text-xs text-slate-400 font-mono">
@@ -499,7 +520,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                   {selectedIncident.delivery_status === 'not_sent' && selectedIncident.status !== 'resolved' && (
                     <button
                       onClick={handleSendWhatsApp}
-                      className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center space-x-1.5 transition shadow-sm"
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-medium text-white flex items-center space-x-1.5 transition shadow-sm"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Send WhatsApp Demo Alert</span>
@@ -518,7 +539,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                 </div>
 
                 {previewText && (
-                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-200 whitespace-pre-wrap">
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-blue-200 whitespace-pre-wrap">
                     {previewText}
                   </div>
                 )}
@@ -527,7 +548,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
               {/* Frozen Evidence Snapshot */}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center space-x-1.5">
-                  <FileSearch className="w-3.5 h-3.5 text-cyan-400" />
+                  <FileSearch className="w-3.5 h-3.5 text-blue-400" />
                   <span>Frozen Evidence Snapshot (At Creation)</span>
                 </h4>
 
@@ -564,7 +585,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                       <span className="text-[11px] text-slate-400 block mb-1">Top Recorded Factors:</span>
                       <div className="flex flex-wrap gap-1.5">
                         {selectedIncident.model_evidence.map((f, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-mono text-cyan-300 border border-slate-700">
+                          <span key={i} className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-mono text-blue-300 border border-slate-700">
                             {f.feature}: {f.contribution > 0 ? '+' : ''}{f.contribution.toFixed(3)}
                           </span>
                         ))}
@@ -577,7 +598,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
               {/* Audit Trail Timeline */}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center space-x-1.5">
-                  <History className="w-3.5 h-3.5 text-cyan-400" />
+                  <History className="w-3.5 h-3.5 text-blue-400" />
                   <span>Audit Trail</span>
                 </h4>
 
@@ -593,7 +614,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                         <div className="flex items-center space-x-2">
                           <span className="font-mono text-slate-400">{event.from_status} →</span>
                           <span className="font-bold text-slate-100">{event.to_status}</span>
-                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-cyan-950 text-cyan-300 font-mono">
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-blue-950 text-blue-300 font-mono">
                             code: {event.action_code}
                           </span>
                         </div>
@@ -645,10 +666,10 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                 <span>Twilio WhatsApp Sandbox Setup Guide</span>
               </span>
               <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] leading-relaxed">
-                <li>Log in to <a href="https://console.twilio.com/" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Twilio Console</a> and open <strong>Messaging &gt; Try it out &gt; Send a WhatsApp message</strong>.</li>
+                <li>Log in to <a href="https://console.twilio.com/" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Twilio Console</a> and open <strong>Messaging &gt; Try it out &gt; Send a WhatsApp message</strong>.</li>
                 <li>From your mobile phone WhatsApp, send the sandbox join keyword to <code className="text-emerald-300 font-mono">+1 415 523 8886</code>.</li>
                 <li>Copy your <strong>Account SID</strong> and <strong>Auth Token</strong> below.</li>
-                <li>To enable two-way replies (Commands 1–5), forward port 8000 using ngrok (<code className="text-cyan-300 font-mono">ngrok http 8000</code>) and set the Twilio sandbox webhook to <code className="text-cyan-300 font-mono">https://&lt;subdomain&gt;.ngrok-free.app/webhooks/whatsapp</code>.</li>
+                <li>To enable two-way replies (Commands 1–5), forward port 8000 using ngrok (<code className="text-blue-300 font-mono">ngrok http 8000</code>) and set the Twilio sandbox webhook to <code className="text-blue-300 font-mono">https://&lt;subdomain&gt;.ngrok-free.app/webhooks/whatsapp</code>.</li>
               </ol>
             </div>
 
@@ -664,7 +685,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                     placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     value={waForm.account_sid}
                     onChange={(e) => setWaForm({ ...waForm, account_sid: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -678,7 +699,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                     placeholder="Auth Token"
                     value={waForm.auth_token}
                     onChange={(e) => setWaForm({ ...waForm, auth_token: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -694,7 +715,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                     placeholder="whatsapp:+14155238886"
                     value={waForm.from_number}
                     onChange={(e) => setWaForm({ ...waForm, from_number: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -708,7 +729,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                     placeholder="whatsapp:+919876543210"
                     value={waForm.to_number}
                     onChange={(e) => setWaForm({ ...waForm, to_number: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -723,7 +744,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                   placeholder="https://your-domain.ngrok-free.app/webhooks/whatsapp"
                   value={waForm.webhook_url}
                   onChange={(e) => setWaForm({ ...waForm, webhook_url: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -736,7 +757,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                   placeholder="demo-operator-key (or leave blank to auto-generate)"
                   value={waForm.api_key}
                   onChange={(e) => setWaForm({ ...waForm, api_key: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -745,7 +766,7 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
                   href="https://www.twilio.com/docs/whatsapp/sandbox"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[11px] text-cyan-400 hover:underline flex items-center space-x-1"
+                  className="text-[11px] text-blue-400 hover:underline flex items-center space-x-1"
                 >
                   <span>Twilio Docs</span>
                   <ExternalLink className="w-3 h-3" />
