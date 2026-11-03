@@ -1,8 +1,8 @@
 # Factory Copilot
 
-Stage 3: a trained benchmark classifier and evaluation view, four Streamlit tabs, a FastAPI input contract, a fixed profile, SQLite incidents, technician responses and an optional Twilio WhatsApp adapter.
+Stage 4: benchmark classification with SHAP explanations and source-labelled references, four Streamlit tabs, SQLite incidents, technician responses and an optional Twilio WhatsApp adapter.
 
-**Synthetic benchmark demonstration only. Not validated for physical equipment.** Model scores come from a trained classifier. Default custom inputs are illustrative; the named low/high scenarios are actual validation rows selected using model scores. Incidents are manually opened, with the backend recording its own assessment and model version. WhatsApp is disabled unless explicitly configured and its send button is used. SHAP and inspection guidance are not implemented yet.
+**Synthetic benchmark demonstration only. Not validated for physical equipment.** Model scores come from a trained classifier. Named low/high scenarios are actual validation rows. Incidents are manually opened; the backend stores its assessment, explanation and evidence snapshot. WhatsApp requires configuration and an explicit send action. Retrieved references are not equipment-specific repair procedures.
 
 ## Run on Windows (Python 3.10+)
 
@@ -85,6 +85,16 @@ Reproduce in a new experiment directory (the trainer refuses to overwrite an eva
 
 Do not use repeated final-test results to tune the model. To use a new experiment, set `FACTORY_MODEL_DIR` to its path. Sources, license and mirror provenance are in `data/README.md`; exact splits, metrics and demo samples are included under `ml/artifacts`. The same data is synthetic and row-correlated; these results do not prove generalization to a different machine, future time period or physical failure horizon.
 
+## Stage 4 explanations and guidance
+
+After validating a reading in Monitor, click **Explain this reading**. Three sections show model factors, source excerpts and curated guidance. Choose **Equipment-specific guidance (unsupported demo)** to exercise abstention. New incident records preserve the evidence snapshot; older records are not silently re-explained.
+
+SHAP TreeExplainer explains the uncalibrated tree classifier's log-odds. Product-type one-hot contributions are summed into one factor. The backend checks that the baseline plus all contributions reproduces the raw model output. The top three are ranked by absolute contribution; signs indicate whether they raise or lower that output. These values are not calibrated probability percentage points, safe-range deviations or confirmed physical causes. Unsupported model types or SHAP failures yield an explicit unavailable result while preserving numerical prediction.
+
+Retrieval uses curated feature tags and positive top contributors. Each excerpt carries a title, URL, section and applicability note. Manufacturer references are educational only because AI4I identifies no validated Haas machine. Equipment-specific requests, irrelevant factors and missing/invalid corpora return insufficient evidence. The corpus hash and text are stored in the incident. See `knowledge/README.md` for provenance and limits.
+
+The current wording is deterministic, with no LLM call or API key required. Optional free-form LLM summaries are deferred; no claim of LLM grounding evaluation is made.
+
 ## Checks
 
 ```powershell
@@ -99,7 +109,7 @@ Core workflow tests can be run independently: `python -m unittest discover -s te
 
 2. Implemented: technician lifecycle, labelled response simulation and WhatsApp adapter; live integration verification pending.
 3. Implemented: AI4I acquisition, documented splits, baseline/candidate training, calibration, evaluation and direct inference.
-4. SHAP evidence, curated guidance retrieval and optional LLM wording.
+4. Implemented: SHAP evidence and curated source retrieval; optional LLM wording deferred.
 5. End-to-end replay and incident workflow.
 6. Submission documentation, clean setup verification and demo recording.
 

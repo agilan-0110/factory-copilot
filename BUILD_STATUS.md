@@ -1,36 +1,21 @@
-# Build checkpoint
+# Build checkpoint: Stage 4
 
-## Stages 1, 2 and 3 implemented
+Implemented: calibrated AI4I benchmark classifier, four-tab interface, incident lifecycle, optional WhatsApp adapter, SHAP model factors, curated source references, equipment-specific abstention and immutable incident evidence snapshots.
 
-- Four-tab Streamlit UI, fixed demo profile and FastAPI backend.
-- Input validation, SQLite persistence and idempotent manual incident creation.
-- Setup instructions and API integration tests.
-- No ML or messaging output is simulated as real.
-- Transactional acknowledge/inspect/resolve workflow with separate findings and source-labelled audit history.
-- Shared response logic, duplicate reply protection, fixed-recipient Twilio adapter and signed webhook checks.
-- Operator API key support, one-attempt notification reservation and no automatic retry after uncertain outcomes.
-- AI4I CSV with mirror provenance, four disjoint splits, calibrated logistic/tree candidates, validation-only selection, final-test metrics and a saved inference artifact.
-- Prediction API, real recorded demo inputs, stored incident assessment snapshots and an evaluation/reliability view.
-- XGBoost unavailable: histogram gradient boosting was used and labelled explicitly. Published-rule baseline outperformed the learned model on this synthetic benchmark.
+## Verification (2026-11-03)
 
-## Verification in this environment
+- All 24 unittest checks passed in the cloud runtime, including the previously blocked Stage 1/2 API tests, signed webhook validation, ML separation, real SHAP additivity, source-ID integrity and fallback behavior.
+- Streamlit AppTest with a live local FastAPI subprocess passed: four tabs, high-score sample (97.6%), explanation display, unsupported equipment abstention and incident creation.
+- These are automated UI checks, not visual screenshot QA or a real phone delivery test.
+- Dependencies installed successfully in the cloud. SHAP 0.49.1 and scikit-learn 1.7.2 are used; httpx2 is included for the current Starlette test client.
+- The trained model was restored unchanged from GitHub; there was no retraining or test-set retuning.
 
-- Python compilation passed.
-- Seven workflow/service tests passed, including simulated lifecycle, invalid ordering, reply collisions, missing credentials and mocked send deduplication/timeout handling.
-- Five ML tests passed: explicit feature allowlist, disjoint/reproducible splits, training-only preprocessing, real inference with immutable incident snapshots, and missing-artifact fallback.
-- Direct database checks passed: persistence, event deduplication and absent prediction values.
-- Schema checks exercised missing inputs, unsupported profile/product type, negative torque and extra target fields.
-- HTTP integration suite did not complete with the preinstalled FastAPI/TestClient stack; it was stopped. Rerun in the project virtual environment after dependencies install.
-- Dependency installation failed because the package index hostname could not be resolved. Streamlit startup and visual verification remain pending.
+## Remaining
 
-## Next checkpoint
+Real WhatsApp delivery/reply test; visual polish; regional-language templates; automatic replay/cooldown integration; delivery-status callbacks; final submission preparation. Optional LLM wording remains deferred; guidance uses deterministic curated text. Manufacturer references are educational and no physical equipment procedures are validated.
 
-Install requirements, run `python -m unittest discover -s tests -v`, then launch both services and verify the four tabs. Stage 2 API/security tests are included but still require a successful integration run. No real WhatsApp message has been sent or received. Streamlit and Twilio are not installed in this execution environment; the package installation retry could not retrieve FastAPI from the index.
+## Workspace
 
-Working directory: `C:\Workspace\AI-Projects\factory-copilot`.
+The laptop workspace remains C:\Workspace\AI-Projects\factory-copilot. This stage was completed in a cloud checkout after the laptop runtime became unavailable; the laptop copy is not automatically synchronized. Download/pull the published GitHub checkpoint before running there.
 
-Remaining: live phone test, visual UI check, API integration validation, cross-event cooldown when automatic alerts are introduced, delivery callbacks, regional-language templates, and Stage 4 SHAP/source-backed guidance. Stage 3 training and direct inference ran successfully using preinstalled ML packages; full app dependencies remain unavailable.
-
-Remote repository: https://github.com/agilan-0110/factory-copilot
-
-Publishing uses the GitHub connector because local Git index writes are blocked by workspace permissions. Local Git tracking is not synchronized yet.
+Repository: https://github.com/agilan-0110/factory-copilot

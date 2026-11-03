@@ -21,6 +21,29 @@ def api(method, path, payload=None):
         return None
 
 
+def show_evidence(result):
+    explanation = result.get('explanation') or {}
+    st.markdown('**Model evidence**')
+    if explanation.get('status') == 'available':
+        st.caption(explanation['output_scale'])
+        st.table(explanation['top_factors'])
+        st.caption(explanation['limitations'])
+        st.json(explanation, expanded=False)
+    else:
+        st.info('SHAP unavailable for this record. The numerical assessment is separate.')
+    guidance = result.get('guidance') or {}
+    st.markdown('**Source evidence**')
+    for source in guidance.get('sources', []):
+        st.markdown(f"[{source['id']}: {source['source_title']}]({source['url']})")
+        st.caption(source['section'])
+        st.write('Source excerpt: ' + source['excerpt'])
+        st.caption('Applicability: ' + source['applicability'])
+    st.markdown('**Inspection guidance**')
+    st.info(guidance.get('summary', 'No evidence snapshot saved for this older incident.'))
+    for item in guidance.get('inspection_guidance', []):
+        st.write(f"[{item['evidence_id']}] {item['text']}")
+
+
 st.title("Factory Copilot")
 st.caption("Machine health • Evidence • Maintenance workflow")
 st.warning("Synthetic benchmark demo · Not validated for physical equipment. Scores classify benchmark failure labels, not future breakdowns.")
@@ -55,6 +78,7 @@ with monitor:
                        rotational_speed_rpm=speed, torque_nm=torque, tool_wear_min=wear, product_type=product)
         result = api("POST", "/readings/validate", reading)
         st.session_state.pop('assessment', None)
+        st.session_state.pop('evidence', None)
         if result:
             st.session_state.validated = result["reading"]
             st.session_state.event_id = uuid4().hex
@@ -69,13 +93,20 @@ with monitor:
             st.metric('Benchmark failure-label probability', f"{assessment['probability']:.1%}")
             st.write(f"Alert threshold: {assessment['threshold']:.0%} | Flagged: {assessment['flagged']}")
             st.caption(assessment['context'])
+            mode = st.selectbox('Guidance scope', ['benchmark_reference', 'equipment_specific'],
+                format_func=lambda value: 'Benchmark references' if value == 'benchmark_reference' else 'Equipment-specific guidance (unsupported demo)')
+            if st.button('Explain this reading'):
+                st.session_state.evidence = api('POST', '/explain', {'reading': st.session_state.validated, 'scope': mode})
+                st.session_state.evidence_scope = mode
+            if st.session_state.get('evidence') and st.session_state.get('evidence_scope') == mode:
+                show_evidence(st.session_state.evidence)
         st.json(st.session_state.validated, expanded=False)
         st.caption("Incident creation uses this validated snapshot. Submit the form again to apply edits or begin a new event.")
         if st.button("Create manual demo incident"):
             result = api("POST", "/incidents", {"event_id": st.session_state.event_id, "reading": st.session_state.validated})
             if result:
                 st.success(f"Incident {result['id']} is open. No message was sent.")
-    st.info("Incidents are opened manually in this stage. SHAP and source-backed guidance arrive in Stage 4.")
+    st.info("Incidents are opened manually. Model factors and retrieved references do not establish physical causes.")
 
 with incidents:
     st.subheader("Incident history")
@@ -91,7 +122,7 @@ with incidents:
                 st.write(f"**Recorded benchmark score:** {item['probability']:.1%}")
                 st.caption('Model: ' + item['model_version'])
             st.json(item["reading"])
-            st.caption("Model evidence and inspection guidance are not available yet.")
+            show_evidence(item)
             st.markdown('**Simulated technician response**')
             actions = {'open': {1: 'Acknowledge'}, 'acknowledged': {
                 2: 'Issue confirmed', 3: 'No issue found', 4: 'Inspection inconclusive'},
@@ -124,7 +155,7 @@ with profile:
         st.table(settings["input_schema"])
         st.json({k: v for k, v in settings.items() if k != "input_schema"})
         st.caption("Profile compatibility is fixed. Stage 2 uses an English template and a recipient set through backend environment variables. Phone numbers are not displayed here.")
-        health = api('GET', '/health')
+        health = api('GET', '/health') or {}
         if health:
             st.write('WhatsApp configuration: ' + health['messaging'])
 

@@ -23,3 +23,9 @@ class SimulatedReply(BaseModel):
     model_config = ConfigDict(extra="forbid")
     command: Literal[1, 2, 3, 4, 5]
     event_id: str = Field(min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
+
+
+class ExplanationRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    reading: Reading
+    scope: Literal['benchmark_reference', 'equipment_specific'] = 'benchmark_reference'

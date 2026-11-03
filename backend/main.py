@@ -7,8 +7,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Depends, Response
 from backend import database, workflow, messaging
-from backend.schemas import IncidentCreate, Reading, SimulatedReply
+from backend.schemas import IncidentCreate, Reading, SimulatedReply, ExplanationRequest
 from backend.prediction import Predictor
+from backend.explanation import ModelExplainer
+from backend.guidance import retrieve
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,6 +19,14 @@ def create_app(db_path=None):
     path = Path(db_path or os.environ.get("FACTORY_DB_PATH", ROOT / "runtime/factory.db"))
     settings = messaging.config()
     predictor = Predictor(os.environ.get('FACTORY_MODEL_DIR', ROOT / 'ml/artifacts'))
+    explainer = ModelExplainer(predictor)
+
+    def evidence(reading, scope='benchmark_reference'):
+        result = predictor.assess(reading)
+        result['explanation'] = explainer.explain(reading)
+        result['model_evidence'] = result['explanation'].get('top_factors', [])
+        result['guidance'] = retrieve(result['explanation'], scope, reading.profile_id)
+        return result
 
     def operator(request: Request):
         key = settings['FACTORY_API_KEY']
@@ -32,11 +42,11 @@ def create_app(db_path=None):
         workflow.initialize(path)
         yield
 
-    app = FastAPI(title="Factory Copilot", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="Factory Copilot", version="0.4.0", lifespan=lifespan)
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "stage": 3, "model_ready": predictor.bundle is not None,
+        return {"status": "ok", "stage": 4, "model_ready": predictor.bundle is not None,
                 "messaging": "configured" if messaging.ready(settings) else "disabled"}
 
     @app.get("/profile", dependencies=[Depends(operator)])
@@ -50,7 +60,7 @@ def create_app(db_path=None):
     @app.post("/readings/validate", dependencies=[Depends(operator)])
     def validate(reading: Reading):
         return {"valid": True, "reading": reading.model_dump(), "probability": None,
-                "assessment_status": "Model not trained; input validation only"}
+                "assessment_status": "Input validation only; use /predict for model assessment"}
 
     @app.get("/incidents", dependencies=[Depends(operator)])
     def incidents():
@@ -59,7 +69,7 @@ def create_app(db_path=None):
     @app.post("/incidents", dependencies=[Depends(operator)])
     def create_incident(request: IncidentCreate):
         try:
-            assessment = predictor.assess(request.reading) if predictor.bundle else None
+            assessment = evidence(request.reading) if predictor.bundle else None
             return database.create(path, request, assessment)
         except ValueError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
@@ -68,6 +78,13 @@ def create_app(db_path=None):
     def predict(reading: Reading):
         try:
             return predictor.assess(reading)
+        except RuntimeError as error:
+            raise HTTPException(503, str(error)) from error
+
+    @app.post('/explain', dependencies=[Depends(operator)])
+    def explain(body: ExplanationRequest):
+        try:
+            return evidence(body.reading, body.scope)
         except RuntimeError as error:
             raise HTTPException(503, str(error)) from error
 

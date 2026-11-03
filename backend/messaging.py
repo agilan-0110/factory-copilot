@@ -19,8 +19,12 @@ def message(incident):
     score = incident.get('probability')
     assessment = ('No trained model or failure probability.' if score is None else
         f"Benchmark failure-label probability: {score:.1%}. Threshold: {incident['threshold']:.1%}. Not a future failure forecast.")
+    factors = incident.get('model_evidence') or []
+    factor_text = ', '.join(item['feature'] for item in factors[:3]) or 'Unavailable'
     return (f'Factory Copilot DEMO | {alert}\nProfile: ai4i-demo-v1\n'
             f'Manually opened demo incident. {assessment}\n'
+            f'Top model factors (not causes): {factor_text}\n'
+            'No equipment-specific procedure validated. Review source evidence in the dashboard.\n'
             'Technician assessment required.\nReply with alert ID and command:\n'
             f'{alert} 1 = acknowledge\n{alert} 2 = issue confirmed\n'
             f'{alert} 3 = no issue found\n{alert} 4 = inconclusive\n'

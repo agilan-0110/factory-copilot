@@ -1,0 +1,42 @@
+[
+  {
+    "id": "UCI-HEAT", "source_title": "UCI AI4I 2020 Predictive Maintenance Dataset",
+    "url": "https://archive.ics.uci.edu/dataset/601/ai4i",
+    "section": "Additional Variable Information: heat dissipation failure",
+    "excerpt": "heat dissipation causes a process failure, if the difference between air- and process temperature is below 8.6 K and the tool’s rotational speed is below 1380 rpm.",
+    "kind": "benchmark_definition",
+    "applicability": "Synthetic AI4I label definition only; not a validated equipment limit.",
+    "features": ["air_temperature_k", "process_temperature_k", "rotational_speed_rpm"],
+    "guidance": "Review temperature difference and rotational speed as benchmark inputs. This does not establish a cooling fault on physical equipment."
+  },
+  {
+    "id": "UCI-STRAIN", "source_title": "UCI AI4I 2020 Predictive Maintenance Dataset",
+    "url": "https://archive.ics.uci.edu/dataset/601/ai4i",
+    "section": "Additional Variable Information: overstrain failure",
+    "excerpt": "if the product of tool wear and torque exceeds 11,000 minNm for the L product variant (12,000 M, 13,000 H), the process fails due to overstrain.",
+    "kind": "benchmark_definition",
+    "applicability": "Synthetic label definition only; not a physical diagnosis.",
+    "features": ["tool_wear_min", "torque_nm", "product_type"],
+    "guidance": "Review tool-wear time, torque and product type together as benchmark inputs. Model contributions do not confirm physical overstrain."
+  },
+  {
+    "id": "HAAS-COOLANT", "source_title": "Haas Mill Operator's Manual — Safety",
+    "url": "https://haascnc.com/service/online-operator-s-manuals/mill-operator-s-manual/mill---safety.html",
+    "section": "3.1 General Safety Notes: Maintenance",
+    "excerpt": "Adding coolant and maintaining coolant concentration is required at regular intervals.",
+    "kind": "manufacturer_reference",
+    "applicability": "Haas mills reference only. AI4I has no verified Haas model or coolant measurements. Educational reference, not an equipment-specific instruction.",
+    "features": ["air_temperature_k", "process_temperature_k"],
+    "guidance": "A future validated installation needs the actual equipment's approved coolant-maintenance procedure. These readings do not establish coolant condition."
+  },
+  {
+    "id": "HAAS-TOOLHOLDER", "source_title": "Haas Tooling — Maintenance — Mill",
+    "url": "https://haascnc.com/service/troubleshooting-and-how-to/how-to/mill---tooling---maintenance.html",
+    "section": "Tooling - Maintenance, step 2",
+    "excerpt": "Inspect the retention knob [5] (pull stud) for damage, wear, and proper torque.",
+    "kind": "manufacturer_reference",
+    "applicability": "Haas toolholder reference only. AI4I torque is not retention-knob tightening torque; tool-wear minutes do not measure toolholder wear. No equipment match is established.",
+    "features": ["tool_wear_min", "torque_nm"],
+    "guidance": "This reference illustrates why the actual toolholder model and approved inspection procedure are needed. Do not infer pull-stud condition or tightening settings from AI4I inputs."
+  }
+]
