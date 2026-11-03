@@ -1,4 +1,4 @@
-"""Fleet management and live continuous telemetry measurement for 10 industrial machines."""
+"""Fleet management, live continuous telemetry, and protective auto-trip safety interlocks for 10 industrial CNC machines."""
 import math
 import random
 from datetime import datetime, timezone
@@ -36,6 +36,11 @@ class MachineState:
         self.history: List[dict] = []
         self.active_incident_id: Optional[str] = None
         self.step_count = 0
+        
+        # Protective Safety Interlock Attributes
+        self.is_tripped: bool = False
+        self.trip_reason: Optional[str] = None
+        self.tripped_at: Optional[str] = None
 
     def current_reading(self) -> Reading:
         return Reading(
@@ -49,11 +54,79 @@ class MachineState:
             product_type=self.product_type,
         )
 
+    def diagnose_cause(self) -> str:
+        """Evaluate AI4I mechanical failure physics boundary conditions to diagnose exact cause."""
+        temp_diff = self.process_temp_k - self.air_temp_k
+        
+        # 1. HDF: Process_Temp - Air_Temp < 8.6 K and Speed < 1380 RPM
+        if temp_diff < 8.6 and self.rotational_speed_rpm < 1380:
+            return f"Heat Dissipation Failure (HDF): Thermal delta ({temp_diff:.1f} K) < 8.6 K with low rotational airflow ({self.rotational_speed_rpm:.0f} RPM < 1380 RPM)."
+        
+        # 2. OSF: Tool_Wear * Torque exceeds variant limit
+        strain = self.tool_wear_min * self.torque_nm
+        limit = 11000 if self.product_type == "L" else (12000 if self.product_type == "M" else 13000)
+        if strain > limit:
+            return f"Overstrain Failure (OSF): Stress product {strain:.0f} min·Nm exceeds Variant {self.product_type} threshold ({limit:,} min·Nm)."
+        
+        # 3. PWF: Power outside 3500..9000 W
+        power_w = self.torque_nm * self.rotational_speed_rpm * (2 * math.pi / 60.0)
+        if power_w < 3500:
+            return f"Power Failure (PWF): Spindle stall detected. Mechanical power {power_w:.0f} W is below minimum cutting envelope (3,500 W)."
+        if power_w > 9000:
+            return f"Power Failure (PWF): Drive motor overload. Mechanical power {power_w:.0f} W exceeds maximum motor limit (9,000 W)."
+        
+        # 4. TWF: Critical tool flank wear >= 200 min
+        if self.tool_wear_min >= 200:
+            return f"Tool Wear Failure (TWF): Flank contact wear at {self.tool_wear_min:.1f} min has breached critical fatigue limit (≥ 200 min)."
+        
+        if temp_diff > 12.0:
+            return f"Thermal Runaway: Contact zone temperature elevated by {temp_diff:.1f} K above ambient."
+            
+        return "Multi-Sensor Predictive Threshold Breach: Severe combined spindle torque and tool wear pattern."
+
+    def trip(self, reason: str):
+        """Emergency Protective Shutdown: cut spindle power to 0 RPM / 0 Nm and lock safety interlock."""
+        self.is_tripped = True
+        self.trip_reason = reason
+        self.tripped_at = datetime.now(timezone.utc).isoformat()
+        self.rotational_speed_rpm = 0.0
+        self.torque_nm = 0.0
+
+    def rearm(self):
+        """Clear protective trip latch and re-arm station back to nominal operation."""
+        self.is_tripped = False
+        self.trip_reason = None
+        self.tripped_at = None
+        self.fault_mode = None
+        self.rotational_speed_rpm = float(self.base_speed)
+        self.torque_nm = float(self.base_torque)
+
     def tick(self):
         """Simulate continuous live measurement fluctuation and cutting wear."""
         self.step_count += 1
         
-        # Tool wear accumulates continuously
+        # If machine was tripped, maintain emergency shutdown state (0 RPM, 0 Nm, cooling down)
+        if self.is_tripped:
+            self.rotational_speed_rpm = 0.0
+            self.torque_nm = 0.0
+            # Gradual thermal dissipation toward ambient
+            if self.process_temp_k > self.air_temp_k:
+                self.process_temp_k = max(self.air_temp_k, self.process_temp_k - 0.4)
+            record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "air_temperature_k": round(self.air_temp_k, 2),
+                "process_temperature_k": round(self.process_temp_k, 2),
+                "rotational_speed_rpm": 0.0,
+                "torque_nm": 0.0,
+                "tool_wear_min": round(self.tool_wear_min, 1),
+                "probability": self.last_assessment.get("probability", 0.0) if self.last_assessment else 0.0,
+            }
+            self.history.append(record)
+            if len(self.history) > 30:
+                self.history.pop(0)
+            return
+        
+        # Tool wear accumulates continuously during active cutting
         wear_increment = 0.5 if self.product_type == "H" else (0.8 if self.product_type == "M" else 1.0)
         self.tool_wear_min += wear_increment
 
@@ -67,7 +140,6 @@ class MachineState:
 
         # Apply fault injection or normal dynamics
         if self.fault_mode == "overheat":
-            # Air temp and process temp close together or excessive heating
             self.air_temp_k = 303.5 + random.uniform(-0.2, 0.2)
             self.process_temp_k = 312.8 + random.uniform(-0.3, 0.3)
             self.rotational_speed_rpm = 1320.0 + speed_jitter
@@ -88,7 +160,6 @@ class MachineState:
             heat_delta = 9.8 + (self.torque_nm * self.rotational_speed_rpm / 16000.0)
             self.process_temp_k = self.air_temp_k + heat_delta + random.uniform(-0.1, 0.1)
 
-        # Append to telemetry history (keep last 30 readings)
         record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "air_temperature_k": round(self.air_temp_k, 2),
@@ -106,9 +177,11 @@ class MachineState:
         self.fault_mode = mode
 
     def replace_tool(self):
+        """Perform preventive maintenance: reset flank wear, clear fault, and re-arm interlock."""
         self.tool_wear_min = 0.0
         self.fault_mode = None
         self.active_incident_id = None
+        self.rearm()
 
 
 class IndustrialFleet:
@@ -116,9 +189,20 @@ class IndustrialFleet:
         self.machines: Dict[str, MachineState] = {
             spec["machine_id"]: MachineState(spec) for spec in MACHINE_SPECS
         }
+        # Automatic Emergency Trip Policy
+        self.auto_trip_enabled: bool = True
+        self.auto_trip_threshold: float = 0.60  # Auto-trip when probability >= 60.0%
 
-    def tick_all(self, predictor, explainer, db_path: Optional[str] = None) -> List[dict]:
-        """Advance all 10 machines by one live measurement cycle and evaluate probabilities."""
+    def set_auto_trip_policy(self, threshold: float, enabled: bool):
+        self.auto_trip_threshold = max(0.25, min(0.95, threshold))
+        self.auto_trip_enabled = enabled
+
+    def rearm_machine(self, machine_id: str):
+        if machine_id in self.machines:
+            self.machines[machine_id].rearm()
+
+    def tick_all(self, predictor, explainer, db_path: Optional[str] = None, settings: Optional[dict] = None) -> List[dict]:
+        """Advance all 10 machines by one live measurement cycle, evaluate probabilities, and trigger safety trips."""
         results = []
         for machine_id, m in self.machines.items():
             m.tick()
@@ -126,12 +210,23 @@ class IndustrialFleet:
             
             # ML Assessment
             assessment = predictor.assess(reading)
-            if assessment.get("flagged"):
-                # Calculate SHAP explanation for flagged or critical machines
+            prob = assessment.get("probability", 0.0)
+            
+            # Check for Protective Auto-Trip
+            just_tripped = False
+            if self.auto_trip_enabled and prob >= self.auto_trip_threshold and not m.is_tripped:
+                cause = m.diagnose_cause()
+                m.trip(cause)
+                just_tripped = True
+                assessment["is_tripped"] = True
+                assessment["trip_reason"] = cause
+
+            if assessment.get("flagged") or m.is_tripped:
+                # Calculate SHAP explanation
                 assessment["explanation"] = explainer.explain(reading)
                 assessment["model_evidence"] = assessment["explanation"].get("top_factors", [])
                 
-                # Auto-open or link incident in DB if path provided
+                # Auto-open or link incident in SQLite DB
                 if db_path and not m.active_incident_id:
                     from backend import database
                     from backend.schemas import IncidentCreate
@@ -139,6 +234,15 @@ class IndustrialFleet:
                         event_id = f"auto-{m.machine_id}-{int(datetime.now(timezone.utc).timestamp())}"
                         created = database.create(db_path, IncidentCreate(event_id=event_id, reading=reading), assessment)
                         m.active_incident_id = created["id"]
+                        
+                        # Auto-dispatch WhatsApp alert on protective emergency trip
+                        if just_tripped and settings:
+                            from backend import messaging
+                            if messaging.ready(settings):
+                                try:
+                                    messaging.send(db_path, m.active_incident_id, settings)
+                                except Exception:
+                                    pass
                     except Exception:
                         pass
             else:
@@ -148,8 +252,9 @@ class IndustrialFleet:
             m.last_assessment = assessment
             
             # Classify overall machine status
-            prob = assessment.get("probability", 0.0)
-            if prob >= 0.21:
+            if m.is_tripped:
+                status = "tripped"
+            elif prob >= 0.21:
                 status = "critical"
             elif prob >= 0.12 or m.tool_wear_min >= 190.0:
                 status = "warning"
@@ -167,6 +272,9 @@ class IndustrialFleet:
                 "fault_mode": m.fault_mode,
                 "active_incident_id": m.active_incident_id,
                 "history": m.history[-15:],
+                "is_tripped": m.is_tripped,
+                "trip_reason": m.trip_reason,
+                "tripped_at": m.tripped_at,
             }
             results.append(summary)
         return results
@@ -176,7 +284,9 @@ class IndustrialFleet:
         snapshot = []
         for m in self.machines.values():
             prob = m.last_assessment.get("probability", 0.0) if m.last_assessment else 0.0
-            if prob >= 0.21:
+            if m.is_tripped:
+                status = "tripped"
+            elif prob >= 0.21:
                 status = "critical"
             elif prob >= 0.12 or m.tool_wear_min >= 190.0:
                 status = "warning"
@@ -194,6 +304,9 @@ class IndustrialFleet:
                 "fault_mode": m.fault_mode,
                 "active_incident_id": m.active_incident_id,
                 "history": m.history[-15:],
+                "is_tripped": m.is_tripped,
+                "trip_reason": m.trip_reason,
+                "tripped_at": m.tripped_at,
             })
         return snapshot
 

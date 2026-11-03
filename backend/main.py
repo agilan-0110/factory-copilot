@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 import os
 import hmac
 import re
@@ -65,14 +66,14 @@ def create_app(db_path=None):
     @app.get('/fleet', dependencies=[Depends(operator)])
     def get_fleet():
         if predictor.bundle and not fleet.machines['M-01'].last_assessment:
-            fleet.tick_all(predictor, explainer, str(path))
+            fleet.tick_all(predictor, explainer, str(path), get_settings())
         return fleet.get_snapshot()
 
     @app.post('/fleet/tick', dependencies=[Depends(operator)])
     def tick_fleet():
         if not predictor.bundle:
             raise HTTPException(503, 'Model not trained.')
-        return fleet.tick_all(predictor, explainer, str(path))
+        return fleet.tick_all(predictor, explainer, str(path), get_settings())
 
     @app.post('/fleet/machines/{machine_id}/inject-fault', dependencies=[Depends(operator)])
     def inject_fault(machine_id: str, request: Request):
@@ -84,6 +85,26 @@ def create_app(db_path=None):
     def replace_tool(machine_id: str):
         fleet.replace_tool(machine_id)
         return {'machine_id': machine_id, 'status': 'tool_replaced'}
+
+    @app.post('/fleet/machines/{machine_id}/rearm', dependencies=[Depends(operator)])
+    def rearm_machine(machine_id: str):
+        fleet.rearm_machine(machine_id)
+        return {'machine_id': machine_id, 'status': 'rearmed'}
+
+    @app.get('/fleet/auto-trip-policy', dependencies=[Depends(operator)])
+    def get_auto_trip_policy():
+        return {'auto_trip_threshold': fleet.auto_trip_threshold, 'auto_trip_enabled': fleet.auto_trip_enabled}
+
+    @app.post('/fleet/auto-trip-policy', dependencies=[Depends(operator)])
+    async def set_auto_trip_policy(request: Request, enabled: Optional[bool] = None, threshold: Optional[float] = None):
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        t = threshold if threshold is not None else float(body.get('threshold', 0.60))
+        e = enabled if enabled is not None else bool(body.get('enabled', True))
+        fleet.set_auto_trip_policy(t, e)
+        return {'auto_trip_threshold': fleet.auto_trip_threshold, 'auto_trip_enabled': fleet.auto_trip_enabled}
 
     @app.post('/rag/chat', dependencies=[Depends(operator)])
     async def rag_chat(request: Request):

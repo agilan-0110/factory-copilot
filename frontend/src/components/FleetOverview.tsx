@@ -14,6 +14,9 @@ import {
   ExternalLink,
   Bot,
   Sparkles,
+  AlertOctagon,
+  RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { FleetMachine } from '../types';
@@ -34,9 +37,16 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
   const streamInterval = 2000;
   const [loading, setLoading] = useState<boolean>(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  
+  // Auto-Trip Safety Policy
+  const [autoTripPolicy, setAutoTripPolicy] = useState<{ threshold: number; enabled: boolean }>({
+    threshold: 0.60,
+    enabled: true,
+  });
 
   useEffect(() => {
     loadFleet();
+    loadPolicy();
   }, []);
 
   useEffect(() => {
@@ -62,6 +72,26 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
       console.error('Failed to load fleet:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPolicy = async () => {
+    try {
+      const p = await api.getAutoTripPolicy();
+      setAutoTripPolicy({ threshold: p.auto_trip_threshold, enabled: p.auto_trip_enabled });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdatePolicy = async (threshold: number, enabled: boolean) => {
+    try {
+      const res = await api.setAutoTripPolicy(threshold, enabled);
+      setAutoTripPolicy({ threshold: res.auto_trip_threshold, enabled: res.auto_trip_enabled });
+      setActionNotice(`Protective Auto-Trip policy updated: ${enabled ? 'ACTIVE' : 'DISABLED'} at ${(threshold * 100).toFixed(0)}% cutoff.`);
+      setTimeout(() => setActionNotice(null), 4000);
+    } catch (err: any) {
+      setActionNotice(`Failed to update policy: ${err.message}`);
     }
   };
 
@@ -91,11 +121,22 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
   const handleReplaceTool = async (machineId: string) => {
     try {
       await api.replaceTool(machineId);
-      setActionNotice(`Tool replaced on ${machineId}. Flank wear reset to 0 min.`);
+      setActionNotice(`Tool replaced on ${machineId}. Wear reset to 0 min & interlock re-armed.`);
       setTimeout(() => setActionNotice(null), 4000);
       handleManualTick();
     } catch (err: any) {
       setActionNotice(`Failed: ${err.message}`);
+    }
+  };
+
+  const handleRearmMachine = async (machineId: string) => {
+    try {
+      await api.rearmMachine(machineId);
+      setActionNotice(`Station ${machineId} interlock cleared. Spindle re-armed.`);
+      setTimeout(() => setActionNotice(null), 4000);
+      handleManualTick();
+    } catch (err: any) {
+      setActionNotice(`Failed to re-arm: ${err.message}`);
     }
   };
 
@@ -104,6 +145,7 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
   const nominalCount = fleet.filter(m => m.status === 'nominal').length;
   const warningCount = fleet.filter(m => m.status === 'warning').length;
   const criticalCount = fleet.filter(m => m.status === 'critical').length;
+  const trippedMachines = fleet.filter(m => m.is_tripped || m.status === 'tripped');
   const fleetHealth = Math.round(((nominalCount * 1.0 + warningCount * 0.5) / (fleet.length || 10)) * 100);
 
   if (fleet.length === 0) {
@@ -121,72 +163,148 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Plant KPI Bar */}
-      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-            <Cpu className="w-5 h-5" />
+      {/* Emergency Trip Banner (When any station is auto-tripped) */}
+      {trippedMachines.length > 0 && (
+        <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-900 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <AlertOctagon className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-bold text-xs uppercase tracking-wider text-rose-800 flex items-center space-x-1.5">
+                <span>Protective Emergency Shutdown Active</span>
+                <span className="px-1.5 py-0.2 rounded bg-rose-200 text-rose-900 text-[10px] font-mono">
+                  {trippedMachines.length} Station{trippedMachines.length > 1 ? 's' : ''} Halted
+                </span>
+              </span>
+              <p className="text-xs text-rose-700 mt-0.5">
+                Spindle motor power was automatically cut to 0 RPM to prevent catastrophic mechanical fracture on station(s):{' '}
+                <span className="font-mono font-bold">{trippedMachines.map(m => m.machine_id).join(', ')}</span>.
+              </p>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Plant Production Floor (10 CNC Stations)</h2>
-              <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-100 text-slate-700 border border-slate-200">
-                2.0s Telemetry Poll
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setSelectedId(trippedMachines[0].machine_id)}
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs transition"
+            >
+              Inspect {trippedMachines[0].machine_id}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top Plant KPI & Auto-Trip Policy Bar */}
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">Plant Production Floor (10 CNC Stations)</h2>
+                <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-100 text-slate-700 border border-slate-200">
+                  2.0s Telemetry Poll
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Continuous thermal drift, spindle load dynamics, tool flank wear, and automated incident triage.
+              </p>
+            </div>
+          </div>
+
+          {/* Status Breakdown & Stream Controls */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono">
+              <span className="text-emerald-700 font-semibold">{nominalCount} Nominal</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-amber-700 font-semibold">{warningCount} Warning</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-rose-700 font-semibold">{criticalCount} Critical</span>
+              {trippedMachines.length > 0 && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-rose-600 font-bold bg-rose-100 px-1 rounded">{trippedMachines.length} Tripped</span>
+                </>
+              )}
+            </div>
+
+            <div className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono">
+              <span className="text-slate-500">Plant Health: </span>
+              <span className={`font-bold ${fleetHealth >= 85 ? 'text-emerald-700' : fleetHealth >= 65 ? 'text-amber-700' : 'text-rose-700'}`}>
+                {fleetHealth}%
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Continuous thermal drift, spindle load dynamics, tool flank wear, and automated incident triage.
-            </p>
+
+            <button
+              onClick={() => setIsLiveStreaming(!isLiveStreaming)}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                isLiveStreaming
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              {isLiveStreaming ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <Pause className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Live Stream</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Paused</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleManualTick}
+              disabled={loading}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition shadow-xs"
+            >
+              <Activity className="w-3.5 h-3.5 text-blue-600" />
+              <span>Tick 1 Cycle</span>
+            </button>
           </div>
         </div>
 
-        {/* Status Breakdown & Stream Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono">
-            <span className="text-emerald-700 font-semibold">{nominalCount} Nominal</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-amber-700 font-semibold">{warningCount} Warning</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-rose-700 font-semibold">{criticalCount} Critical</span>
+        {/* Auto-Trip Protective Interlock Policy Settings */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-3">
+          <div className="flex items-center space-x-2 text-slate-600">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span className="font-semibold text-slate-800">Automated Emergency Trip Safety Policy:</span>
+            <span className="text-[11px] text-slate-500">Cuts spindle motor to 0 RPM &amp; dispatches root-cause alert when threshold is crossed</span>
           </div>
 
-          <div className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono">
-            <span className="text-slate-500">Plant Health: </span>
-            <span className={`font-bold ${fleetHealth >= 85 ? 'text-emerald-700' : fleetHealth >= 65 ? 'text-amber-700' : 'text-rose-700'}`}>
-              {fleetHealth}%
-            </span>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[11px] text-slate-500 font-medium">Trip Cutoff:</span>
+              <select
+                value={autoTripPolicy.threshold}
+                onChange={(e) => handleUpdatePolicy(parseFloat(e.target.value), autoTripPolicy.enabled)}
+                className="bg-slate-50 text-slate-800 border border-slate-200 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value={0.50}>50% Risk (Conservative)</option>
+                <option value={0.60}>60% Risk (Recommended)</option>
+                <option value={0.70}>70% Risk (Standard)</option>
+                <option value={0.80}>80% Risk (High Load)</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => handleUpdatePolicy(autoTripPolicy.threshold, !autoTripPolicy.enabled)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold border transition ${
+                autoTripPolicy.enabled
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              {autoTripPolicy.enabled ? 'Interlock: ACTIVE' : 'Interlock: OFF'}
+            </button>
           </div>
-
-          <button
-            onClick={() => setIsLiveStreaming(!isLiveStreaming)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-              isLiveStreaming
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            {isLiveStreaming ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <Pause className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Live Stream</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5 text-slate-500" />
-                <span>Paused</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleManualTick}
-            disabled={loading}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium border border-slate-200 transition shadow-xs"
-          >
-            <Activity className="w-3.5 h-3.5 text-blue-600" />
-            <span>Tick 1 Cycle</span>
-          </button>
         </div>
       </div>
 
@@ -245,13 +363,15 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
                 <div className="flex items-center space-x-2">
                   <h3 className="text-base font-bold text-slate-900 font-mono">{selectedMachine.machine_id}</h3>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                    selectedMachine.status === 'critical'
+                    selectedMachine.is_tripped || selectedMachine.status === 'tripped'
+                      ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
+                      : selectedMachine.status === 'critical'
                       ? 'bg-rose-50 text-rose-700 border-rose-200'
                       : selectedMachine.status === 'warning'
                       ? 'bg-amber-50 text-amber-800 border-amber-200'
                       : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   }`}>
-                    {selectedMachine.status}
+                    {selectedMachine.is_tripped ? '🚨 E-STOP TRIPPED' : selectedMachine.status}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">{selectedMachine.name}</p>
@@ -266,6 +386,43 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Emergency Shutdown Box if Tripped */}
+            {selectedMachine.is_tripped && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-900 space-y-2.5">
+                <div className="flex items-center space-x-2">
+                  <AlertOctagon className="w-5 h-5 text-rose-600 shrink-0" />
+                  <span className="font-bold text-xs uppercase tracking-wider text-rose-800">
+                    Emergency Auto-Shutdown Interlocked
+                  </span>
+                </div>
+                <p className="text-xs text-rose-700 leading-relaxed">
+                  Spindle power automatically halted (0 RPM • 0 Nm) to protect equipment.
+                </p>
+                <div className="p-2.5 rounded-lg bg-white border border-rose-200 text-xs font-mono space-y-1">
+                  <span className="text-[10px] text-rose-500 font-bold uppercase block">Diagnosed Failure Cause:</span>
+                  <p className="text-rose-900 font-semibold text-[11px] leading-snug">
+                    {selectedMachine.trip_reason || 'Predictive failure threshold breached.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => handleRearmMachine(selectedMachine.machine_id)}
+                    className="py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center space-x-1 transition shadow-xs"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Re-Arm Spindle</span>
+                  </button>
+                  <button
+                    onClick={() => handleReplaceTool(selectedMachine.machine_id)}
+                    className="py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center space-x-1 transition shadow-xs"
+                  >
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>Replace &amp; Reset</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Ask Copilot for this Machine Action */}
             <button
@@ -291,11 +448,15 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
                 </div>
                 <div className="flex justify-between p-2 rounded bg-slate-50 border border-slate-100 text-slate-700">
                   <span className="text-slate-400">Spindle Speed:</span>
-                  <span className="font-semibold text-slate-900">{selectedMachine.reading.rotational_speed_rpm} RPM</span>
+                  <span className={`font-semibold ${selectedMachine.is_tripped ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>
+                    {selectedMachine.reading.rotational_speed_rpm} RPM {selectedMachine.is_tripped ? '(HALTED)' : ''}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded bg-slate-50 border border-slate-100 text-slate-700">
                   <span className="text-slate-400">Torque:</span>
-                  <span className="font-semibold text-slate-900">{selectedMachine.reading.torque_nm} Nm</span>
+                  <span className={`font-semibold ${selectedMachine.is_tripped ? 'text-rose-600 font-bold' : 'text-slate-900'}`}>
+                    {selectedMachine.reading.torque_nm} Nm {selectedMachine.is_tripped ? '(CUT)' : ''}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded bg-slate-50 border border-slate-100 text-slate-700">
                   <span className="text-slate-400">Tool Wear:</span>
@@ -361,7 +522,7 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
                   className="p-1.5 rounded bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center space-x-1 transition text-left"
                 >
                   <Wrench className="w-3 h-3 text-amber-600 shrink-0" />
-                  <span className="truncate text-[11px] font-medium">Tool Wear Spike</span>
+                  <span className="truncate text-[11px] font-medium">Wear Spike (Trip)</span>
                 </button>
 
                 <button
@@ -381,13 +542,15 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
                 </button>
               </div>
 
-              <button
-                onClick={() => handleReplaceTool(selectedMachine.machine_id)}
-                className="w-full py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-xs"
-              >
-                <Wrench className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Replace Tool (Reset Flank Wear)</span>
-              </button>
+              {!selectedMachine.is_tripped && (
+                <button
+                  onClick={() => handleReplaceTool(selectedMachine.machine_id)}
+                  className="w-full py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-xs"
+                >
+                  <Wrench className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Replace Tool (Reset Flank Wear)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -398,6 +561,7 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
   function renderMachineCard(m: FleetMachine) {
     const isSelected = selectedId === m.machine_id;
     const prob = m.assessment?.probability ?? 0;
+    const isTripped = m.is_tripped || m.status === 'tripped';
     const isCritical = m.status === 'critical';
     const isWarning = m.status === 'warning';
 
@@ -406,7 +570,9 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
         key={m.machine_id}
         onClick={() => setSelectedId(m.machine_id)}
         className={`p-3.5 rounded-xl border cursor-pointer transition space-y-2.5 ${
-          isSelected
+          isTripped
+            ? 'bg-rose-50/40 border-rose-400 shadow-md ring-2 ring-rose-500/20'
+            : isSelected
             ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-500/10'
             : 'bg-white hover:border-slate-300 hover:shadow-sm border-slate-200'
         }`}
@@ -425,26 +591,36 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
 
           <div className="text-right">
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-              isCritical
+              isTripped
+                ? 'bg-rose-600 text-white border-rose-700 animate-pulse shadow-xs'
+                : isCritical
                 ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                 : isWarning
                 ? 'bg-amber-50 text-amber-800 border-amber-200'
                 : 'bg-emerald-50 text-emerald-700 border-emerald-200'
             }`}>
-              {m.status}
+              {isTripped ? '🚨 AUTO-TRIPPED' : m.status}
             </span>
           </div>
         </div>
 
         {/* Telemetry Grid */}
-        <div className="grid grid-cols-2 gap-1.5 text-xs font-mono bg-slate-50 p-2 rounded-lg border border-slate-100 text-slate-700">
+        <div className={`grid grid-cols-2 gap-1.5 text-xs font-mono p-2 rounded-lg border ${
+          isTripped
+            ? 'bg-rose-100/60 border-rose-200 text-rose-900'
+            : 'bg-slate-50 border-slate-100 text-slate-700'
+        }`}>
           <div>
             <span className="text-slate-400 text-[10px] block">Speed</span>
-            <span className="text-slate-900 font-semibold">{m.reading.rotational_speed_rpm} RPM</span>
+            <span className={`font-semibold ${isTripped ? 'text-rose-700 font-bold' : 'text-slate-900'}`}>
+              {m.reading.rotational_speed_rpm} RPM {isTripped ? '(HALTED)' : ''}
+            </span>
           </div>
           <div>
             <span className="text-slate-400 text-[10px] block">Torque</span>
-            <span className="text-slate-900 font-semibold">{m.reading.torque_nm} Nm</span>
+            <span className={`font-semibold ${isTripped ? 'text-rose-700 font-bold' : 'text-slate-900'}`}>
+              {m.reading.torque_nm} Nm {isTripped ? '(CUT)' : ''}
+            </span>
           </div>
           <div>
             <span className="text-slate-400 text-[10px] block">Proc. Temp</span>
@@ -461,7 +637,7 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
         {/* Failure Risk Progress */}
         <div className="space-y-1">
           <div className="flex justify-between text-[11px] font-mono">
-            <span className="text-slate-500">Failure Risk</span>
+            <span className="text-slate-500">{isTripped ? 'Tripped Risk' : 'Failure Risk'}</span>
             <span className={`font-bold ${prob >= 0.21 ? 'text-rose-600' : prob >= 0.12 ? 'text-amber-600' : 'text-emerald-700'}`}>
               {(prob * 100).toFixed(1)}%
             </span>
@@ -476,21 +652,38 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
           </div>
         </div>
 
-        {/* Card Footer: Ask Copilot trigger */}
+        {/* Card Footer: Trip diagnostic or Ask Copilot */}
         <div className="pt-1 flex items-center justify-between text-[11px] border-t border-slate-100">
-          <span className="text-slate-400 font-mono text-[10px]">
-            {m.fault_mode ? `⚠️ ${m.fault_mode}` : 'Nominal profile'}
+          <span className="text-slate-400 font-mono text-[10px] truncate max-w-[150px]">
+            {isTripped
+              ? `🚨 ${m.trip_reason?.split(':')[0] || 'Auto-Shutdown'}`
+              : m.fault_mode
+              ? `⚠️ ${m.fault_mode}`
+              : 'Nominal profile'}
           </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenCopilotForMachine?.(m.machine_id);
-            }}
-            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition"
-          >
-            <Bot className="w-3 h-3" />
-            <span>Ask Copilot</span>
-          </button>
+          {isTripped ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRearmMachine(m.machine_id);
+              }}
+              className="text-[11px] font-bold text-rose-700 hover:text-rose-900 flex items-center space-x-1 transition"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Re-Arm</span>
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCopilotForMachine?.(m.machine_id);
+              }}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition"
+            >
+              <Bot className="w-3 h-3" />
+              <span>Ask Copilot</span>
+            </button>
+          )}
         </div>
       </div>
     );

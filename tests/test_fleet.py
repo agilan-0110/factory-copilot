@@ -55,6 +55,49 @@ class FleetTests(unittest.TestCase):
         self.assertEqual(m3_after['tool_wear_min'], 0.0)
         self.assertIsNone(m3_after['fault_mode'])
 
+    def test_auto_trip_policy_get_and_set(self):
+        # Default policy
+        res = self.client.get('/fleet/auto-trip-policy')
+        self.assertEqual(res.status_code, 200)
+        policy = res.json()
+        self.assertTrue(policy['auto_trip_enabled'])
+        self.assertAlmostEqual(policy['auto_trip_threshold'], 0.60)
+
+        # Update policy
+        update_res = self.client.post('/fleet/auto-trip-policy', json={'enabled': True, 'threshold': 0.75})
+        self.assertEqual(update_res.status_code, 200)
+        updated = update_res.json()
+        self.assertTrue(updated['auto_trip_enabled'])
+        self.assertAlmostEqual(updated['auto_trip_threshold'], 0.75)
+
+    def test_emergency_auto_trip_and_rearm(self):
+        # Set threshold to 50%
+        self.client.post('/fleet/auto-trip-policy', json={'enabled': True, 'threshold': 0.50})
+        # Inject wear_spike on M-05 to drive failure risk high
+        self.client.post('/fleet/machines/M-05/inject-fault?mode=wear_spike')
+        
+        # Tick fleet to evaluate risk and trip
+        self.client.post('/fleet/tick')
+        
+        m5 = next(m for m in self.client.get('/fleet').json() if m['machine_id'] == 'M-05')
+        self.assertTrue(m5.get('is_tripped'))
+        self.assertEqual(m5.get('status'), 'tripped')
+        self.assertEqual(m5['reading']['rotational_speed_rpm'], 0.0)
+        self.assertEqual(m5['reading']['torque_nm'], 0.0)
+        self.assertIsNotNone(m5.get('trip_reason'))
+
+        # Check that subsequent ticks keep the spindle at 0 RPM
+        self.client.post('/fleet/tick')
+        m5_latched = next(m for m in self.client.get('/fleet').json() if m['machine_id'] == 'M-05')
+        self.assertTrue(m5_latched.get('is_tripped'))
+        self.assertEqual(m5_latched['reading']['rotational_speed_rpm'], 0.0)
+
+        # Test re-arm
+        rearm_res = self.client.post('/fleet/machines/M-05/rearm')
+        self.assertEqual(rearm_res.status_code, 200)
+        rearm_data = rearm_res.json()
+        self.assertEqual(rearm_data.get('status'), 'rearmed')
+
 
 if __name__ == '__main__':
     unittest.main()

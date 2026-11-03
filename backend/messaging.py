@@ -34,18 +34,28 @@ def ready(settings):
 def message(incident):
     alert = incident['id']
     score = incident.get('probability')
-    assessment = ('No trained model or failure probability.' if score is None else
-        f"Benchmark failure-label probability: {score:.1%}. Threshold: {incident['threshold']:.1%}. Not a future failure forecast.")
+    trip_reason = incident.get('trip_reason')
+    is_tripped = incident.get('is_tripped') or bool(trip_reason)
+
+    if is_tripped:
+        header = f"🚨 FACTORY COPILOT | EMERGENCY AUTO-SHUTDOWN | {alert}"
+        status_info = (f"STATUS: MACHINE TRIPPED & INTERLOCKED (Spindle Halted: 0 RPM)\n"
+                       f"DIAGNOSED CAUSE: {trip_reason or 'Predictive Failure Threshold Breached'}\n"
+                       f"Failure Risk: {score:.1%} (Auto-Trip Cutoff)")
+    else:
+        header = f"Factory Copilot DEMO | {alert}"
+        status_info = ('No trained model or failure probability.' if score is None else
+            f"Benchmark failure-label probability: {score:.1%}. Threshold: {incident['threshold']:.1%}. Not a future failure forecast.")
+
     factors = incident.get('model_evidence') or []
     factor_text = ', '.join(item['feature'] for item in factors[:3]) or 'Unavailable'
-    return (f'Factory Copilot DEMO | {alert}\nProfile: ai4i-demo-v1\n'
-            f'Synthetic benchmark demo incident. {assessment}\n'
+    return (f'{header}\nProfile: ai4i-demo-v1\n'
+            f'{status_info}\n'
             f'Top model factors (not causes): {factor_text}\n'
-            'No equipment-specific procedure validated. Review source evidence in the dashboard.\n'
-            'Technician assessment required.\nReply with alert ID and command:\n'
+            'Technician inspection & physical reset required.\nReply with alert ID and command:\n'
             f'{alert} 1 = acknowledge\n{alert} 2 = issue confirmed\n'
             f'{alert} 3 = no issue found\n{alert} 4 = inconclusive\n'
-            f'{alert} 5 = resolve after inspection')
+            f'{alert} 5 = resolve & clear interlock')
 
 
 def send(path, incident_id, settings, client=None):

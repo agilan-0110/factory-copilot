@@ -23,13 +23,16 @@ export interface FleetMachine {
   machine_id: string;
   name: string;
   product_type: 'L' | 'M' | 'H';
-  status: 'nominal' | 'warning' | 'critical';
+  status: 'nominal' | 'warning' | 'critical' | 'tripped';
   reading: Reading;
   assessment?: AssessmentResult | null;
   tool_wear_min: number;
   fault_mode?: string | null;
   active_incident_id?: string | null;
   history: MachineTelemetryHistory[];
+  is_tripped?: boolean;
+  trip_reason?: string | null;
+  tripped_at?: string | null;
 }
 
 export interface Factor {

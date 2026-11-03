@@ -53,6 +53,20 @@ export const api = {
       method: 'POST',
     }),
 
+  rearmMachine: (machine_id: string) =>
+    request<{ machine_id: string; status: string }>(`/fleet/machines/${machine_id}/rearm`, {
+      method: 'POST',
+    }),
+
+  getAutoTripPolicy: () =>
+    request<{ auto_trip_threshold: number; auto_trip_enabled: boolean }>('/fleet/auto-trip-policy'),
+
+  setAutoTripPolicy: (threshold: number, enabled: boolean) =>
+    request<{ auto_trip_threshold: number; auto_trip_enabled: boolean }>('/fleet/auto-trip-policy', {
+      method: 'POST',
+      body: JSON.stringify({ threshold, enabled }),
+    }),
+
   getProfile: () => request<MachineProfile>('/profile'),
   
   validateReading: (reading: Reading) => 
