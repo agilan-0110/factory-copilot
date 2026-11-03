@@ -9,7 +9,8 @@ API = os.environ.get("FACTORY_API_URL", "http://127.0.0.1:8000").rstrip("/")
 
 def api(method, path, payload=None):
     try:
-        response = requests.request(method, API + path, json=payload, timeout=10)
+        response = requests.request(method, API + path, json=payload, timeout=20,
+            headers={'X-API-Key': os.environ.get('FACTORY_API_KEY', '')})
         if not response.ok:
             st.error(f"Request rejected ({response.status_code})")
             st.json(response.json())
@@ -22,7 +23,7 @@ def api(method, path, payload=None):
 
 st.title("Factory Copilot")
 st.caption("Machine health • Evidence • Maintenance workflow")
-st.warning("Synthetic benchmark demo · Not validated for physical equipment. Stage 1 has no trained model.")
+st.warning("Synthetic benchmark demo · Not validated for physical equipment. No trained model yet.")
 monitor, incidents, profile, evaluation = st.tabs(["Monitor", "Incidents", "Machine Profile", "Evaluation"])
 
 with monitor:
@@ -67,9 +68,32 @@ with incidents:
         st.info("No incidents yet. Validate a reading in Monitor to create your first test incident.")
     for item in history or []:
         with st.expander(f"{item['id']} · {item['status'].title()} · {item['created_at']}"):
-            st.write("**Origin:** Manual Stage 1 demo · **Delivery:** Not sent")
+            st.write(f"**Origin:** Manual demo · **Notification:** {item['delivery_status']}")
+            st.write(f"**Inspection finding:** {item['finding'] or 'Not recorded'}")
             st.json(item["reading"])
-            st.caption("Model evidence and inspection guidance are unavailable. Technician workflow arrives in Stage 2.")
+            st.caption("Model evidence and inspection guidance are not available yet.")
+            st.markdown('**Simulated technician response**')
+            actions = {'open': {1: 'Acknowledge'}, 'acknowledged': {
+                2: 'Issue confirmed', 3: 'No issue found', 4: 'Inspection inconclusive'},
+                'inspected': {5: 'Resolve'}, 'resolved': {}}
+            options = actions[item['status']]
+            if options:
+                choice = st.selectbox('Action', list(options), format_func=options.get, key='action-'+item['id'])
+                if st.button('Apply simulated response', key='reply-'+item['id']):
+                    result = api('POST', f"/incidents/{item['id']}/simulate-reply",
+                        {'command': choice, 'event_id': uuid4().hex})
+                    if result:
+                        st.rerun()
+            st.caption('Resolution does not prove the prediction was correct. Findings are stored separately.')
+            if st.button('Show audit trail', key='audit-'+item['id']):
+                trail = api('GET', f"/incidents/{item['id']}/history")
+                st.json(trail or [])
+            if item['delivery_status'] == 'not_sent' and item['status'] != 'resolved':
+                if st.button('Send WhatsApp demo alert', key='notify-'+item['id']):
+                    result = api('POST', f"/incidents/{item['id']}/notify")
+                    if result:
+                        st.rerun()
+            st.caption('WhatsApp requires local configuration. Provider acceptance is not confirmed phone delivery. Unknown outcomes require checking provider logs; automatic resends are blocked.')
 
 with profile:
     st.subheader("Supported profile")
@@ -79,7 +103,10 @@ with profile:
         st.info(settings["deployment_status"])
         st.table(settings["input_schema"])
         st.json({k: v for k, v in settings.items() if k != "input_schema"})
-        st.caption("Profile compatibility is fixed. Contact and language configuration will be added with messaging.")
+        st.caption("Profile compatibility is fixed. Stage 2 uses an English template and a recipient set through backend environment variables. Phone numbers are not displayed here.")
+        health = api('GET', '/health')
+        if health:
+            st.write('WhatsApp configuration: ' + health['messaging'])
 
 with evaluation:
     st.subheader("Evaluation readiness")
