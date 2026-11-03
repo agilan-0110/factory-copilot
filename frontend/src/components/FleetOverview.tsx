@@ -106,6 +106,16 @@ export const FleetOverview: React.FC<FleetOverviewProps> = ({
   const criticalCount = fleet.filter(m => m.status === 'critical').length;
   const fleetHealth = Math.round(((nominalCount * 1.0 + warningCount * 0.5) / (fleet.length || 10)) * 100);
 
+  if (fleet.length === 0) {
+    return (
+      <div className="p-16 text-center text-slate-400 space-y-3 bg-slate-900 border border-slate-800 rounded-xl shadow-lg">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm font-semibold text-slate-200">Connecting to Plant Floor Telemetry Stream (10 Stations)...</p>
+        <p className="text-xs text-slate-500">Establishing real-time sensor polling loop</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Plant KPI & Continuous Stream Controller */}
