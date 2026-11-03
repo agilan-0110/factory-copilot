@@ -7,7 +7,9 @@ import {
   BookOpen, 
   ExternalLink, 
   Cpu, 
-  CheckCircle2, 
+  CheckCircle2,
+  Key,
+  X,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { ChatMessage, KnowledgeDoc, FleetMachine } from '../types';
@@ -45,6 +47,9 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({ fleet, initialMachineId 
   const [loading, setLoading] = useState(false);
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
   const [showDocs, setShowDocs] = useState(false);
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('factory_gemini_api_key') || '');
+  const [tempKey, setTempKey] = useState<string>(apiKey);
+  const [showKeyModal, setShowKeyModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -82,7 +87,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({ fleet, initialMachineId 
 
     try {
       const machineScope = selectedMachineId === 'all' ? undefined : selectedMachineId;
-      const response = await api.chatRAG(textToSend, machineScope);
+      const response = await api.chatRAG(textToSend, machineScope, apiKey || undefined);
 
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -141,6 +146,22 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({ fleet, initialMachineId 
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setTempKey(apiKey);
+                setShowKeyModal(true);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center space-x-1.5 transition ${
+                apiKey
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/80 hover:bg-emerald-900/50'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title="Configure Google Gemini API Key"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>{apiKey ? 'Gemini Key Active' : 'Set API Key'}</span>
+            </button>
+
             <button
               onClick={() => setShowDocs(!showDocs)}
               className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1.5 transition"
@@ -314,6 +335,89 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({ fleet, initialMachineId 
           </div>
         </div>
       </div>
+      {/* API Key Configuration Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Key className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Google Gemini API Key</h3>
+                  <p className="text-[11px] text-slate-400">Power RAG responses with live generative LLM synthesis</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeyModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Enter your Gemini API key (<code className="text-cyan-400 font-mono">AIzaSy...</code>) to enable Google's Gemini LLM. Responses will blend live machine telemetry and technical failure mechanics. If omitted, the assistant uses the deterministic grounded synthesizer offline.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={tempKey}
+                onChange={(e) => setTempKey(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-cyan-400 hover:underline flex items-center space-x-1"
+              >
+                <span>Get key at Google AI Studio</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              <div className="flex items-center space-x-2">
+                {apiKey && (
+                  <button
+                    onClick={() => {
+                      setApiKey('');
+                      setTempKey('');
+                      localStorage.removeItem('factory_gemini_api_key');
+                      setShowKeyModal(false);
+                    }}
+                    className="px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-950/40 rounded-lg border border-rose-900/60 transition"
+                  >
+                    Remove
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const clean = tempKey.trim();
+                    setApiKey(clean);
+                    if (clean) {
+                      localStorage.setItem('factory_gemini_api_key', clean);
+                    } else {
+                      localStorage.removeItem('factory_gemini_api_key');
+                    }
+                    setShowKeyModal(false);
+                  }}
+                  className="px-4 py-1.5 text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg shadow hover:opacity-90 transition"
+                >
+                  Save Key
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

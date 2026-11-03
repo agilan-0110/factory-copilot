@@ -113,10 +113,10 @@ export const api = {
 
   getSamples: () => request<Array<{ name: string; label: string; reading: Reading }>>('/samples'),
 
-  chatRAG: (message: string, machine_id?: string) =>
-    request<{ reply: string; retrieved_sources: any[]; machine_context?: any; grounding_verified: boolean }>('/rag/chat', {
+  chatRAG: (message: string, machine_id?: string, api_key?: string) =>
+    request<{ reply: string; retrieved_sources: any[]; machine_context?: any; grounding_verified: boolean; mode?: string }>('/rag/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, machine_id }),
+      body: JSON.stringify({ message, machine_id, api_key: api_key || undefined }),
     }),
 
   getKnowledge: () => request<any[]>('/rag/knowledge'),

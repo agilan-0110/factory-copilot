@@ -89,6 +89,7 @@ def create_app(db_path=None):
         if not message:
             raise HTTPException(400, 'Message cannot be empty.')
         machine_id = body.get('machine_id')
+        api_key = body.get('api_key') or request.headers.get('x-gemini-api-key')
         machine_ctx = None
         if machine_id and machine_id in fleet.machines:
             m = fleet.machines[machine_id]
@@ -102,7 +103,7 @@ def create_app(db_path=None):
                 'active_incident_id': m.active_incident_id
             }
         fleet_ctx = fleet.get_snapshot()
-        return rag.answer(message, machine_ctx, fleet_ctx)
+        return rag.answer(message, machine_ctx, fleet_ctx, api_key=api_key)
 
     @app.get('/rag/knowledge', dependencies=[Depends(operator)])
     def get_knowledge():

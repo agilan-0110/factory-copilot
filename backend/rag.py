@@ -200,8 +200,8 @@ class RAGAssistant:
             return self.docs[:top_k]
         return [item[1] for item in scored[:top_k]]
 
-    def answer(self, query: str, machine_context: Optional[dict] = None, fleet_context: Optional[List[dict]] = None) -> dict:
-        """Synthesize a grounded answer using retrieved documents and live machine context."""
+    def answer(self, query: str, machine_context: Optional[dict] = None, fleet_context: Optional[List[dict]] = None, api_key: Optional[str] = None) -> dict:
+        """Synthesize a grounded answer using retrieved documents, live machine context, and optional Gemini LLM."""
         retrieved = self.retrieve(query, machine_context, top_k=3)
         
         # Check if query references a specific machine
@@ -212,11 +212,11 @@ class RAGAssistant:
                     target_machine = m
                     break
 
-        # Check if Gemini API key is available
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if api_key and not api_key.startswith("AQ."): # Not an internal vertex token
+        # Check if Gemini API key is available (passed directly or from environment)
+        resolved_key = (api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+        if resolved_key:
             try:
-                llm_response = self._call_gemini_llm(query, retrieved, target_machine, api_key)
+                llm_response = self._call_gemini_llm(query, retrieved, target_machine, resolved_key)
                 if llm_response:
                     return {
                         "reply": llm_response,
@@ -287,32 +287,43 @@ class RAGAssistant:
         return "\n\n".join(sections)
 
     def _call_gemini_llm(self, query: str, docs: List[dict], machine: Optional[dict], api_key: str) -> Optional[str]:
-        """Optional LLM generation using Google Gemini API."""
+        """Call Google Gemini API with grounded technical context and machine telemetry."""
         context_str = "\n\n".join([f"[{d['id']}] {d['title']}:\n{d['content']}\nGuidance: {d['guidance']}" for d in docs])
         machine_str = str(machine) if machine else "No specific machine selected."
         
         system_instruction = (
             "You are Factory Copilot RAG Assistant, an expert AI maintenance engineer for an industrial manufacturing plant. "
-            "Answer the user's question clearly, professionally, and concisely. "
-            "CRITICAL: Ground your answer strictly in the provided technical documents and live machine context. "
-            "Always cite the source document IDs using [DOC-ID] and machine IDs using [M-XX]. "
-            "Do not invent unvalidated equipment repair steps."
+            "Answer the user's question clearly, professionally, and concisely using GitHub-flavored Markdown. "
+            "CRITICAL RULES:\n"
+            "1. Ground your answer strictly in the provided technical documents and live machine context.\n"
+            "2. Always cite source document IDs using [DOC-ID] and machine stations using [M-XX].\n"
+            "3. Include actionable diagnostic recommendations.\n"
+            "4. Never invent unvalidated equipment repair procedures."
         )
 
         prompt = (
             f"User Question: {query}\n\n"
-            f"Live Machine Context:\n{machine_str}\n\n"
+            f"Live Machine Telemetry Context:\n{machine_str}\n\n"
             f"Retrieved Technical Documentation:\n{context_str}\n\n"
-            "Please provide a grounded diagnostic answer with recommendations and source citations."
+            "Provide a grounded, professional diagnostic answer citing relevant [DOC-ID] sources."
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        res = requests.post(url, json={
+        payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "systemInstruction": {"parts": [{"text": system_instruction}]}
-        }, timeout=8)
-        
-        if res.ok:
-            data = res.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+        }
+
+        # Try gemini-2.0-flash, then gemini-1.5-flash
+        models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key.strip()}"
+            try:
+                res = requests.post(url, json=payload, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
+                        return candidates[0]["content"]["parts"][0]["text"]
+            except Exception:
+                continue
         return None
