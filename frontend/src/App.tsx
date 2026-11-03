@@ -57,7 +57,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900">
       <Header
         activeTab={activeTab}
         setActiveTab={(t) => setActiveTab(t as any)}
@@ -68,14 +68,14 @@ export function App() {
       />
 
       {backendError && (
-        <div className="bg-rose-950/80 border-b border-rose-800 text-rose-200 px-4 py-2 text-xs flex items-center justify-between">
+        <div className="bg-rose-50 border-b border-rose-200 text-rose-800 px-4 py-2 text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{backendError}</span>
           </div>
           <button
             onClick={fetchHealthAndIncidents}
-            className="flex items-center space-x-1 underline hover:text-white"
+            className="flex items-center space-x-1 underline hover:text-rose-950 font-medium"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry Connection</span>
@@ -119,7 +119,7 @@ export function App() {
       {isCopilotOpen && (
         <div
           onClick={() => setIsCopilotOpen(false)}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs transition-opacity"
         />
       )}
 
@@ -127,7 +127,7 @@ export function App() {
       {!isCopilotOpen && (
         <button
           onClick={() => handleOpenCopilot()}
-          className="fixed bottom-6 right-6 z-30 px-4 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-xl shadow-blue-900/40 flex items-center space-x-2 transition hover:scale-105 border border-blue-400/30"
+          className="fixed bottom-6 right-6 z-30 px-4 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-lg shadow-blue-500/25 flex items-center space-x-2 transition hover:scale-105 border border-blue-500"
           title="Open AI Maintenance Copilot (Available on all screens)"
         >
           <Bot className="w-4 h-4 text-white" />
@@ -136,14 +136,14 @@ export function App() {
         </button>
       )}
 
-      {/* Clean Industrial Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-900/60 py-3.5 mt-8">
+      {/* Clean Light Industrial Footer */}
+      <footer className="border-t border-slate-200 bg-white py-4 mt-8 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2 font-mono">
           <div>
             <span>Factory Copilot • 10-Station CNC Milling Floor • Grounded RAG Assistant</span>
           </div>
           <div className="flex items-center space-x-4">
-            <span>FastAPI: <code className="text-slate-400">127.0.0.1:8000</code></span>
+            <span>FastAPI: <code className="text-slate-700 font-semibold">127.0.0.1:8000</code></span>
             <span>HGB Classifier (F2 @ 21%)</span>
             <span>SHAP 0.49.1</span>
           </div>

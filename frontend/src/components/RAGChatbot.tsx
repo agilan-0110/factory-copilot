@@ -136,17 +136,17 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
   };
 
   return (
-    <div className={`flex flex-col h-full bg-slate-900 border border-slate-800 ${isDrawer ? 'rounded-l-2xl border-r-0 shadow-2xl' : 'rounded-2xl shadow-lg'} overflow-hidden`}>
+    <div className={`flex flex-col h-full bg-white border border-slate-200 ${isDrawer ? 'rounded-l-2xl border-r-0 shadow-2xl' : 'rounded-2xl shadow-lg'} overflow-hidden`}>
       {/* Top Header */}
-      <div className="px-4 py-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between shrink-0">
+      <div className="px-4 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
             <Bot className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-semibold text-white tracking-tight">AI Maintenance Copilot</h3>
-              <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-800 text-slate-300 border border-slate-700">
+              <h3 className="text-sm font-semibold text-slate-900 tracking-tight">AI Maintenance Copilot</h3>
+              <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-100 text-slate-700 border border-slate-200">
                 RAG Grounded
               </span>
             </div>
@@ -185,7 +185,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
 
           <button
             onClick={clearChat}
-            className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
             title="Clear Chat History"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -194,7 +194,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
           {isDrawer && onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition ml-1"
+              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition ml-1"
               title="Close Copilot Drawer"
             >
               <X className="w-4 h-4" />
@@ -204,7 +204,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
       </div>
 
       {/* Machine Context Selector Bar */}
-      <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between text-xs shrink-0">
+      <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs shrink-0">
         <div className="flex items-center space-x-2">
           <Cpu className="w-3.5 h-3.5 text-blue-400" />
           <span className="text-slate-400 font-medium">Context Station:</span>
@@ -212,7 +212,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
         <select
           value={selectedMachineId}
           onChange={(e) => setSelectedMachineId(e.target.value)}
-          className="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+          className="bg-white text-slate-800 border border-slate-300 rounded px-2.5 py-1 text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
         >
           <option value="all">🌐 Entire Fleet Overview</option>
           {fleet.map((m) => (
@@ -225,7 +225,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
 
       {/* Docs Drawer when toggled */}
       {showDocs && (
-        <div className="p-3.5 bg-slate-950 border-b border-slate-800 max-h-56 overflow-y-auto space-y-2 shrink-0">
+        <div className="p-3.5 bg-slate-50 border-b border-slate-200 max-h-56 overflow-y-auto space-y-2 shrink-0">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
             <span>Indexed Technical Knowledge Base ({knowledgeDocs.length} Docs)</span>
             <button onClick={() => setShowDocs(false)} className="text-slate-500 hover:text-slate-300">
@@ -234,12 +234,12 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {knowledgeDocs.map((doc) => (
-              <div key={doc.id} className="p-2 rounded bg-slate-900 border border-slate-800 space-y-1 text-xs">
+              <div key={doc.id} className="p-2 rounded bg-white border border-slate-200 space-y-1 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-mono font-bold text-blue-400 text-[10px]">[{doc.id}]</span>
                   <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">{doc.category}</span>
                 </div>
-                <p className="font-medium text-slate-200 text-[11px] truncate">{doc.title}</p>
+                <p className="font-medium text-slate-800 text-[11px] truncate">{doc.title}</p>
                 <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] text-slate-400 hover:text-blue-400 flex items-center space-x-1">
                   <span className="truncate">{doc.source}</span>
                   <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -262,8 +262,8 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
               <div
                 className={`max-w-[90%] rounded-xl px-4 py-3 text-xs leading-relaxed space-y-2.5 shadow-sm ${
                   isUser
-                    ? 'bg-blue-600 text-white font-medium rounded-br-xs'
-                    : 'bg-slate-800/90 text-slate-200 border border-slate-700/70 rounded-bl-xs'
+                    ? 'bg-blue-600 text-slate-900 font-medium rounded-br-xs'
+                    : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-bl-xs'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -282,7 +282,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                           href={s.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-900 text-[11px] font-mono text-blue-300 hover:text-blue-200 border border-slate-700 hover:border-blue-500 transition"
+                          className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-white text-[11px] font-mono text-blue-700 hover:text-blue-800 font-semibold border border-slate-700 hover:border-blue-500 transition"
                         >
                           <span>[{s.id}] {s.title}</span>
                           <ExternalLink className="w-2.5 h-2.5" />
@@ -309,7 +309,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
       </div>
 
       {/* Suggestion Chips */}
-      <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/40 overflow-x-auto whitespace-nowrap shrink-0">
+      <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 overflow-x-auto whitespace-nowrap shrink-0">
         <div className="flex items-center space-x-1.5">
           <Sparkles className="w-3 h-3 text-blue-400 shrink-0" />
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Quick:</span>
@@ -317,7 +317,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
             <button
               key={idx}
               onClick={() => handleSend(s)}
-              className="text-[11px] px-2.5 py-1 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition shrink-0"
+              className="text-[11px] px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 transition shrink-0"
             >
               {s}
             </button>
@@ -326,7 +326,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
       </div>
 
       {/* Input Bar */}
-      <div className="p-3 bg-slate-900 border-t border-slate-800 shrink-0">
+      <div className="p-3 bg-white border-t border-slate-200 shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -343,12 +343,12 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                 ? "Ask about plant fleet, failure mechanics (HDF, OSF, PWF, TWF), or protocols..."
                 : `Ask about station ${selectedMachineId} telemetry, diagnostics, or tool wear...`
             }
-            className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+            className="flex-1 bg-slate-50 border border-slate-700/80 rounded-lg px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
           />
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5"
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-slate-900 text-xs font-semibold shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5"
           >
             <span>Send</span>
             <Send className="w-3.5 h-3.5" />
@@ -359,20 +359,20 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
       {/* API Key Modal */}
       {showKeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="bg-white border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
                   <Key className="w-4 h-4 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Google Gemini API Key</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Google Gemini API Key</h3>
                   <p className="text-[11px] text-slate-400">Enhance RAG synthesis with generative LLM reasoning</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowKeyModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                className="text-slate-400 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-800 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -391,11 +391,11 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                 value={tempKey}
                 onChange={(e) => setTempKey(e.target.value)}
                 placeholder="AIzaSy..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg text-slate-900 px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
               <a
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
@@ -430,7 +430,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                     }
                     setShowKeyModal(false);
                   }}
-                  className="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow transition"
+                  className="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg shadow transition"
                 >
                   Save Key
                 </button>
