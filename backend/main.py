@@ -277,7 +277,7 @@ def create_app(db_path=None):
     def whatsapp_status():
         s = get_settings()
         is_ready = messaging.ready(s)
-        missing = [k for k, v in s.items() if not v]
+        missing = [k for k in ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM', 'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL') if not s.get(k)]
         return {
             'ready': is_ready,
             'account_sid': (s['TWILIO_ACCOUNT_SID'][:6] + '...') if s['TWILIO_ACCOUNT_SID'] else '',
@@ -319,7 +319,10 @@ def create_app(db_path=None):
         try:
             return messaging.test_send(s)
         except Exception as error:
-            raise HTTPException(502, f'Twilio test send failed: {str(error)}')
+            err_msg = str(error)
+            if 'ContentSid Required' in err_msg or '21654' in err_msg:
+                raise HTTPException(400, f"Twilio Sandbox session not active yet. Open WhatsApp on {s['DEMO_WHATSAPP_TO']} and send your sandbox join phrase (e.g. 'join <keyword>') to {s['TWILIO_WHATSAPP_FROM']}. Once connected, tap 'Send Test Ping' again.")
+            raise HTTPException(502, f'Twilio test send failed: {err_msg}')
 
     @app.post('/incidents/{incident_id}/notify', dependencies=[Depends(operator)])
     def notify(incident_id: str):

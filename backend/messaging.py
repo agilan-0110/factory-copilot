@@ -18,7 +18,7 @@ def config():
             pass
     res = {}
     for key in ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM',
-                'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL', 'FACTORY_API_KEY'):
+                'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL', 'FACTORY_API_KEY', 'TWILIO_CONTENT_SID'):
         if key in os.environ:
             res[key] = os.environ[key]
         else:
@@ -27,8 +27,13 @@ def config():
 
 
 def ready(settings):
-    return all(settings.values()) and all(re.fullmatch(r'whatsapp:\+[1-9][0-9]{7,14}', settings[k])
-        for k in ('TWILIO_WHATSAPP_FROM', 'DEMO_WHATSAPP_TO')) and settings['TWILIO_WEBHOOK_URL'].startswith('https://')
+    twilio_keys = ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM', 'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL')
+    return (
+        all(bool(settings.get(k)) for k in twilio_keys) and
+        all(bool(re.fullmatch(r'whatsapp:\+[1-9][0-9]{7,14}', settings.get(k, '')))
+            for k in ('TWILIO_WHATSAPP_FROM', 'DEMO_WHATSAPP_TO')) and
+        settings.get('TWILIO_WEBHOOK_URL', '').startswith('https://')
+    )
 
 
 def message(incident):
@@ -70,8 +75,17 @@ def send(path, incident_id, settings, client=None):
     if not reserved:
         return {'status': incident['delivery_status'], 'duplicate': True}
     try:
-        response = client.messages.create(from_=settings['TWILIO_WHATSAPP_FROM'],
-            to=settings['DEMO_WHATSAPP_TO'], body=message(incident))
+        create_kwargs = {
+            'from_': settings['TWILIO_WHATSAPP_FROM'],
+            'to': settings['DEMO_WHATSAPP_TO'],
+        }
+        if settings.get('TWILIO_CONTENT_SID'):
+            import json
+            create_kwargs['content_sid'] = settings['TWILIO_CONTENT_SID']
+            create_kwargs['content_variables'] = json.dumps({'1': message(incident)})
+        else:
+            create_kwargs['body'] = message(incident)
+        response = client.messages.create(**create_kwargs)
     except Exception:
         # A timeout can occur after provider acceptance. Never retry automatically.
         workflow.finish_notification(path, incident_id, 'unknown')
@@ -117,9 +131,15 @@ def test_send(settings, client=None):
         "WhatsApp channel verified!\n"
         "10-Machine plant telemetry alerts and technician lifecycle commands (1-5) are active."
     )
-    response = client.messages.create(
-        from_=settings['TWILIO_WHATSAPP_FROM'],
-        to=settings['DEMO_WHATSAPP_TO'],
-        body=test_body
-    )
+    create_kwargs = {
+        'from_': settings['TWILIO_WHATSAPP_FROM'],
+        'to': settings['DEMO_WHATSAPP_TO'],
+    }
+    if settings.get('TWILIO_CONTENT_SID'):
+        import json
+        create_kwargs['content_sid'] = settings['TWILIO_CONTENT_SID']
+        create_kwargs['content_variables'] = json.dumps({'1': test_body})
+    else:
+        create_kwargs['body'] = test_body
+    response = client.messages.create(**create_kwargs)
     return {'status': 'provider_accepted', 'sid': response.sid}
