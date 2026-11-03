@@ -7,6 +7,7 @@ import {
   FileText, 
   MessageSquare,
   Layers,
+  Bot,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -72,6 +73,18 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Layers className="w-4 h-4 text-cyan-400" />
             <span>Plant Fleet (10 Machines)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex items-center space-x-2 py-2.5 px-4 border-b-2 text-sm font-medium transition-all ${
+              activeTab === 'chat'
+                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            <Bot className="w-4 h-4 text-cyan-400" />
+            <span>AI Copilot (RAG Chat)</span>
           </button>
 
           <button

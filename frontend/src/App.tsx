@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { FleetOverview } from './components/FleetOverview';
+import { RAGChatbot } from './components/RAGChatbot';
 import { LiveMonitor } from './components/LiveMonitor';
 import { IncidentManager } from './components/IncidentManager';
 import { MachineProfileView } from './components/MachineProfileView';
 import { EvaluationDashboard } from './components/EvaluationDashboard';
 import { api } from './api/client';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import type { FleetMachine } from './types';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'fleet' | 'monitor' | 'incidents' | 'profile' | 'evaluation'>('fleet');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'chat' | 'monitor' | 'incidents' | 'profile' | 'evaluation'>('fleet');
   const [health, setHealth] = useState<{ status: string; stage: number; model_ready: boolean; messaging: string } | null>(null);
+  const [fleet, setFleet] = useState<FleetMachine[]>([]);
   const [incidentCount, setIncidentCount] = useState<number>(0);
   const [backendError, setBackendError] = useState<string | null>(null);
 
@@ -20,7 +23,14 @@ export function App() {
       setHealth(h);
       setBackendError(null);
     } catch {
-      setBackendError('FastAPI Backend is currently unreachable at http://127.0.0.1:8000. Start it with: python -m uvicorn backend.main:app --port 8000');
+      setBackendError('FastAPI Backend is currently unreachable. Start it with: python -m uvicorn backend.main:app --port 8000');
+    }
+
+    try {
+      const f = await api.getFleet();
+      setFleet(f);
+    } catch {
+      // ignore
     }
 
     try {
@@ -69,6 +79,11 @@ export function App() {
             onNavigateToIncidents={() => setActiveTab('incidents')}
           />
         )}
+        {activeTab === 'chat' && (
+          <RAGChatbot
+            fleet={fleet}
+          />
+        )}
         {activeTab === 'monitor' && <LiveMonitor onIncidentCreated={fetchHealthAndIncidents} />}
         {activeTab === 'incidents' && <IncidentManager onRefresh={fetchHealthAndIncidents} />}
         {activeTab === 'profile' && <MachineProfileView />}
@@ -78,7 +93,7 @@ export function App() {
       <footer className="border-t border-slate-800/80 bg-slate-900/60 py-4 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <div>
-            <span>Factory Copilot • Industrial Plant Fleet Management (10 Stations) • AI4I 2020</span>
+            <span>Factory Copilot • Industrial Plant Fleet Management (10 Stations) • RAG Assistant</span>
           </div>
           <div className="flex items-center space-x-4">
             <span>FastAPI REST: <code className="text-slate-400">127.0.0.1:8000</code></span>

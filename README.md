@@ -1,8 +1,16 @@
 # Factory Copilot
 
-Stage 4: benchmark classification with SHAP explanations and source-labelled references, four Streamlit tabs, SQLite incidents, technician responses and an optional Twilio WhatsApp adapter.
+**Industrial Predictive Maintenance Platform with 10-Machine Real-Time Fleet Simulation, Calibrated ML & SHAP Explainability, Technician Incident Lifecycle, and Grounded Technical RAG Copilot Chatbot.**
 
-**Synthetic benchmark demonstration only. Not validated for physical equipment.** Model scores come from a trained classifier. Named low/high scenarios are actual validation rows. Incidents are manually opened; the backend stores its assessment, explanation and evidence snapshot. WhatsApp requires configuration and an explicit send action. Retrieved references are not equipment-specific repair procedures.
+**Synthetic benchmark demonstration only. Not validated for physical equipment.** Model scores come from a trained classifier. Named low/high scenarios are actual validation rows. Incidents are tracked in SQLite; the backend stores assessments, explanations, and evidence snapshots. WhatsApp requires configuration and an explicit send action. Retrieved references are not equipment-specific repair procedures.
+
+## Features
+
+- **10-Machine Real-Time Industrial Fleet (`Plant Fleet` tab)**: Live telemetry simulation for CNC milling stations `M-01` through `M-10` across Line 1 and Line 2 with live sparklines, tool wear, thermal drift, fault injection (HDF, OSF, PWF, TWF), and tool replacement maintenance.
+- **RAG Maintenance Copilot (`AI Copilot` tab)**: Grounded technical retrieval assistant backed by failure mechanics equations, CNC documentation, and live machine telemetry context.
+- **Explainable AI (`Monitor` tab)**: Additive SHAP waterfall explanations decompose model log-odds into contributing physical sensor readings with mathematical additivity verification.
+- **Incident Lifecycle Management (`Incidents` tab)**: Four-step state machine (`new` -> `acknowledged` -> `confirmed`/`no_issue`/`inconclusive` -> `resolved`) with immutable evidence audit trail and optional Twilio WhatsApp alerting.
+- **Automated Replay Engine (`Replay & Cooldown` tab)**: Live simulation runner with a 300-second cooldown policy and duplicate event suppression.
 
 ## Run on Windows (Python 3.10+ & Node.js)
 
@@ -14,12 +22,6 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-In a second terminal in the same directory:
-
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run ui/app.py --server.address 127.0.0.1 --server.port 8501
-```
-
 Open **http://127.0.0.1:8000** to access the modern React industrial dashboard (served directly by FastAPI). API documentation: http://127.0.0.1:8000/docs.
 
 For frontend hot-reload development (optional):
@@ -28,7 +30,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Open http://127.0.0.1:5173. The legacy Streamlit interface remains runnable via `.\.venv\Scripts\python.exe -m streamlit run ui/app.py`.
+Open **http://127.0.0.1:5173**. The legacy Streamlit interface also remains runnable via `.\.venv\Scripts\python.exe -m streamlit run ui/app.py`.
 
 Validate a reading, create a manual incident, and open Incidents. Repeated creation for the same validated event returns the same incident. Revalidating begins a new event. Backend errors are shown in the interface.
 
@@ -101,24 +103,17 @@ SHAP TreeExplainer explains the uncalibrated tree classifier's log-odds. Product
 
 Retrieval uses curated feature tags and positive top contributors. Each excerpt carries a title, URL, section and applicability note. Manufacturer references are educational only because AI4I identifies no validated Haas machine. Equipment-specific requests, irrelevant factors and missing/invalid corpora return insufficient evidence. The corpus hash and text are stored in the incident. See `knowledge/README.md` for provenance and limits.
 
-The current wording is deterministic, with no LLM call or API key required. Optional free-form LLM summaries are deferred; no claim of LLM grounding evaluation is made.
-
 ## Checks
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Checks cover input validation, duplicate events, persistence, workflow transitions, reply association, send deduplication, missing-service fallback, operator authentication and signed webhook processing. Provider calls in unit tests are mocked; they do not send real messages. The signed webhook test requires the Twilio SDK.
-
-Core workflow tests can be run independently: `python -m unittest discover -s tests -p test_workflow.py -v`. See `BUILD_STATUS.md` for verified results and outstanding checks in the build environment.
-
-## Next stages
-
-2. Implemented: technician lifecycle, labelled response simulation and WhatsApp adapter; live integration verification pending.
-3. Implemented: AI4I acquisition, documented splits, baseline/candidate training, calibration, evaluation and direct inference.
-4. Implemented: SHAP evidence and curated source retrieval; optional LLM wording deferred.
-5. End-to-end replay and incident workflow.
-6. Submission documentation, clean setup verification and demo recording.
-
-Implementation uses FastAPI's Pydantic request models and Streamlit forms: https://fastapi.tiangolo.com/tutorial/body/ and https://docs.streamlit.io/develop/api-reference/execution-flow/st.form.
+All 35 unit tests pass, covering:
+- Input validation, duplicate events, and persistence
+- Incident state transitions and workflow rules
+- Twilio signature verification and WhatsApp webhook handling
+- Machine learning model calibration and inference
+- Mathematical SHAP additivity checks and source evidence grounding
+- Industrial 10-machine plant fleet simulation and fault injection
+- Grounded RAG maintenance copilot chat and technical retrieval

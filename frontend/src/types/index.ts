@@ -158,6 +158,26 @@ export interface EvaluationMetrics {
   };
 }
 
+export interface KnowledgeDoc {
+  id: string;
+  title: string;
+  category: string;
+  source: string;
+  url: string;
+  summary: string;
+  content: string;
+  guidance: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  sources?: KnowledgeDoc[];
+  machineContext?: any;
+}
+
 export interface ReplayEvent {
   event_id: string;
   scenario: string;

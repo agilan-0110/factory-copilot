@@ -18,6 +18,7 @@ export default defineConfig({
       '/samples': 'http://127.0.0.1:8000',
       '/replay': 'http://127.0.0.1:8000',
       '/readings': 'http://127.0.0.1:8000',
+      '/rag': 'http://127.0.0.1:8000',
     },
   },
 })

@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from backend import database, workflow, messaging, replay
 from backend.fleet import IndustrialFleet
+from backend.rag import RAGAssistant, KNOWLEDGE_DOCS
 from backend.schemas import IncidentCreate, Reading, SimulatedReply, ExplanationRequest, ReplayRequest
 from backend.prediction import Predictor
 from backend.explanation import ModelExplainer
@@ -23,6 +24,7 @@ def create_app(db_path=None):
     predictor = Predictor(os.environ.get('FACTORY_MODEL_DIR', ROOT / 'ml/artifacts'))
     explainer = ModelExplainer(predictor)
     fleet = IndustrialFleet()
+    rag = RAGAssistant()
 
     def evidence(reading, scope='benchmark_reference'):
         result = predictor.assess(reading)
@@ -79,6 +81,32 @@ def create_app(db_path=None):
     def replace_tool(machine_id: str):
         fleet.replace_tool(machine_id)
         return {'machine_id': machine_id, 'status': 'tool_replaced'}
+
+    @app.post('/rag/chat', dependencies=[Depends(operator)])
+    async def rag_chat(request: Request):
+        body = await request.json()
+        message = body.get('message', '').strip()
+        if not message:
+            raise HTTPException(400, 'Message cannot be empty.')
+        machine_id = body.get('machine_id')
+        machine_ctx = None
+        if machine_id and machine_id in fleet.machines:
+            m = fleet.machines[machine_id]
+            machine_ctx = {
+                'machine_id': m.machine_id,
+                'name': m.name,
+                'status': 'critical' if (m.last_assessment and m.last_assessment.get('probability', 0) >= 0.21) else ('warning' if m.tool_wear_min >= 190 else 'nominal'),
+                'reading': m.current_reading().model_dump(),
+                'tool_wear_min': m.tool_wear_min,
+                'assessment': m.last_assessment,
+                'active_incident_id': m.active_incident_id
+            }
+        fleet_ctx = fleet.get_snapshot()
+        return rag.answer(message, machine_ctx, fleet_ctx)
+
+    @app.get('/rag/knowledge', dependencies=[Depends(operator)])
+    def get_knowledge():
+        return KNOWLEDGE_DOCS
 
     @app.get("/health")
     def health():

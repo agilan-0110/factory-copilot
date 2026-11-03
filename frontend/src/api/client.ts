@@ -112,4 +112,12 @@ export const api = {
   getEvaluation: () => request<EvaluationMetrics>('/evaluation'),
 
   getSamples: () => request<Array<{ name: string; label: string; reading: Reading }>>('/samples'),
+
+  chatRAG: (message: string, machine_id?: string) =>
+    request<{ reply: string; retrieved_sources: any[]; machine_context?: any; grounding_verified: boolean }>('/rag/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, machine_id }),
+    }),
+
+  getKnowledge: () => request<any[]>('/rag/knowledge'),
 };
