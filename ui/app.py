@@ -23,42 +23,59 @@ def api(method, path, payload=None):
 
 st.title("Factory Copilot")
 st.caption("Machine health • Evidence • Maintenance workflow")
-st.warning("Synthetic benchmark demo · Not validated for physical equipment. No trained model yet.")
+st.warning("Synthetic benchmark demo · Not validated for physical equipment. Scores classify benchmark failure labels, not future breakdowns.")
+health = api('GET', '/health') or {}
 monitor, incidents, profile, evaluation = st.tabs(["Monitor", "Incidents", "Machine Profile", "Evaluation"])
 
 with monitor:
     st.subheader("Demonstration station")
     st.write("Enter readings to validate the input contract and create a manual test incident.")
     st.caption("Defaults are illustrative inputs, not recorded AI4I samples. Validation checks format and broad bounds, not model compatibility with physical equipment.")
+    preset = {}
+    if health.get('model_ready'):
+        samples = api('GET', '/samples') or []
+        selection = st.selectbox('Input scenario', ['Custom illustrative input'] + [s['name'] for s in samples])
+        for sample in samples:
+            if sample['name'] == selection:
+                preset = sample['reading']
+                st.caption(f"Recorded {sample['source']} row {sample['row_number']}. Samples are not one physical machine's time history.")
     with st.form("reading"):
         left, right = st.columns(2)
         with left:
-            air = st.number_input("Air temperature (K)", value=298.1, min_value=0.1, max_value=1000.0)
-            process = st.number_input("Process temperature (K)", value=308.6, min_value=0.1, max_value=1000.0)
-            speed = st.number_input("Rotational speed (rpm)", value=1551.0, min_value=0.0, max_value=100000.0)
+            air = st.number_input("Air temperature (K)", value=float(preset.get('air_temperature_k', 298.1)), min_value=0.1, max_value=1000.0)
+            process = st.number_input("Process temperature (K)", value=float(preset.get('process_temperature_k', 308.6)), min_value=0.1, max_value=1000.0)
+            speed = st.number_input("Rotational speed (rpm)", value=float(preset.get('rotational_speed_rpm', 1551.0)), min_value=0.0, max_value=100000.0)
         with right:
-            torque = st.number_input("Torque (N·m)", value=42.8, min_value=0.0, max_value=100000.0)
-            wear = st.number_input("Tool wear (min)", value=0.0, min_value=0.0, max_value=100000.0)
-            product = st.selectbox("Product type", ["L", "M", "H"])
+            torque = st.number_input("Torque (N·m)", value=float(preset.get('torque_nm', 42.8)), min_value=0.0, max_value=100000.0)
+            wear = st.number_input("Tool wear (min)", value=float(preset.get('tool_wear_min', 0)), min_value=0.0, max_value=100000.0)
+            product = st.selectbox("Product type", ["L", "M", "H"], index=['L','M','H'].index(preset.get('product_type','L')))
         submitted = st.form_submit_button("Validate reading", type="primary")
     if submitted:
         reading = dict(profile_id="ai4i-demo-v1", air_temperature_k=air, process_temperature_k=process,
                        rotational_speed_rpm=speed, torque_nm=torque, tool_wear_min=wear, product_type=product)
         result = api("POST", "/readings/validate", reading)
+        st.session_state.pop('assessment', None)
         if result:
             st.session_state.validated = result["reading"]
             st.session_state.event_id = uuid4().hex
+            if health.get('model_ready'):
+                st.session_state.assessment = api('POST', '/predict', reading)
         else:
             st.session_state.pop("validated", None)
     if "validated" in st.session_state:
-        st.success("Input validated. No failure assessment has been made.")
+        st.success("Input validated. Results below refer to the submitted snapshot.")
+        assessment = st.session_state.get('assessment')
+        if assessment:
+            st.metric('Benchmark failure-label probability', f"{assessment['probability']:.1%}")
+            st.write(f"Alert threshold: {assessment['threshold']:.0%} | Flagged: {assessment['flagged']}")
+            st.caption(assessment['context'])
         st.json(st.session_state.validated, expanded=False)
         st.caption("Incident creation uses this validated snapshot. Submit the form again to apply edits or begin a new event.")
         if st.button("Create manual demo incident"):
             result = api("POST", "/incidents", {"event_id": st.session_state.event_id, "reading": st.session_state.validated})
             if result:
                 st.success(f"Incident {result['id']} is open. No message was sent.")
-    st.info("Risk assessment, replay and SHAP explanations will be connected after model training.")
+    st.info("Incidents are opened manually in this stage. SHAP and source-backed guidance arrive in Stage 4.")
 
 with incidents:
     st.subheader("Incident history")
@@ -70,6 +87,9 @@ with incidents:
         with st.expander(f"{item['id']} · {item['status'].title()} · {item['created_at']}"):
             st.write(f"**Origin:** Manual demo · **Notification:** {item['delivery_status']}")
             st.write(f"**Inspection finding:** {item['finding'] or 'Not recorded'}")
+            if item.get('probability') is not None:
+                st.write(f"**Recorded benchmark score:** {item['probability']:.1%}")
+                st.caption('Model: ' + item['model_version'])
             st.json(item["reading"])
             st.caption("Model evidence and inspection guidance are not available yet.")
             st.markdown('**Simulated technician response**')
@@ -110,7 +130,30 @@ with profile:
 
 with evaluation:
     st.subheader("Evaluation readiness")
-    st.info("No model has been trained or evaluated. No performance numbers are available.")
-    st.write("Planned: AI4I-only classification, logistic regression baseline, XGBoost candidate, separate calibration and untouched final test set.")
-    st.write("Results will include PR-AUC, prevalence, precision, recall, confusion counts, Brier score and a reliability plot.")
+    report = api('GET', '/evaluation') if health.get('model_ready') else None
+    if report:
+        st.write('Selected model: **' + report['selected_model'] + '**')
+        st.caption(report['selection'])
+        st.write(report['split_method'])
+        st.table([dict(model=name, average_precision=m['average_precision'], precision=m['precision'],
+            recall=m['recall'], brier_score=m['brier_score'], threshold=m['threshold']) for name,m in report['test'].items()])
+        rule = report['engineering_rule']
+        st.info(f"Published-rule baseline: precision {rule['precision']:.1%}, recall {rule['recall']:.1%}. This partially reconstructs synthetic labels; its binary output is not a calibrated probability.")
+        chosen = report['test'][report['selected_model']]
+        st.write(f"Held-out rows: {chosen['sample_count']} | Failure prevalence: {chosen['prevalence']:.1%}")
+        st.write('Average precision is the step-weighted area under the precision-recall curve.')
+        st.write('Confusion counts: rows = actual [normal, failure]; columns = predicted [normal, failure].')
+        st.table(chosen['confusion_matrix'])
+        import pandas as pd
+        reliability = chosen['reliability']
+        st.line_chart(pd.DataFrame({'mean_probability': reliability['mean_probability'],
+            'observed_fraction': reliability['observed_fraction'], 'ideal': reliability['mean_probability']}).set_index('mean_probability'))
+        st.caption('Reliability plot: mean predicted probability versus observed failure fraction in eight quantile bins.')
+        with st.expander('Engineering rule comparison and experiment details'):
+            st.write(report['rule_limitation'])
+            st.json(report)
+        for limitation in report['limitations']:
+            st.caption(limitation)
+    else:
+        st.info('No trained artifact is available. Install ML dependencies and run python -m ml.train.')
     st.caption("Failure classification does not establish time to breakdown. SHAP explains model output, not physical root cause.")

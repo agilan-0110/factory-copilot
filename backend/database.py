@@ -26,22 +26,27 @@ def initialize(path):
             status TEXT NOT NULL DEFAULT 'open', finding TEXT,
             delivery_status TEXT NOT NULL DEFAULT 'not_sent'
         )""")
+        if 'assessment' not in {row['name'] for row in db.execute('PRAGMA table_info(incidents)')}:
+            db.execute('ALTER TABLE incidents ADD COLUMN assessment TEXT')
 
 
 def serialize(row):
     item = dict(row)
     item["reading"] = json.loads(item["reading"])
-    item.update(origin="manual_stage1_demo", probability=None, model_version=None,
+    assessment = json.loads(item.pop('assessment') or '{}')
+    item.update(origin="manual_benchmark_demo", probability=None, model_version=None,
                 model_evidence=[], guidance=None)
+    item.update(assessment)
     return item
 
 
-def create(path, request):
+def create(path, request, assessment=None):
     snapshot = request.reading.model_dump()
     with connect(path) as db:
-        db.execute("INSERT OR IGNORE INTO incidents (id,event_id,reading,created_at) VALUES (?,?,?,?)",
+        db.execute("INSERT OR IGNORE INTO incidents (id,event_id,reading,created_at,assessment) VALUES (?,?,?,?,?)",
                    ("A" + uuid4().hex[:12].upper(), request.event_id,
-                    json.dumps(snapshot, sort_keys=True), datetime.now(timezone.utc).isoformat()))
+                    json.dumps(snapshot, sort_keys=True), datetime.now(timezone.utc).isoformat(),
+                    json.dumps(assessment) if assessment else None))
         row = db.execute("SELECT * FROM incidents WHERE event_id=?", (request.event_id,)).fetchone()
         if json.loads(row["reading"]) != snapshot:
             raise ValueError("This event ID already belongs to different readings. Start a new event.")

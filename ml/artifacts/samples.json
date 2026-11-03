@@ -1,0 +1,28 @@
+[
+  {
+    "name": "low_score",
+    "row_number": 9180,
+    "source": "AI4I validation split",
+    "reading": {
+      "air_temperature_k": 297.9,
+      "process_temperature_k": 309.1,
+      "rotational_speed_rpm": 1435,
+      "torque_nm": 44.7,
+      "tool_wear_min": 8,
+      "product_type": "H"
+    }
+  },
+  {
+    "name": "high_score",
+    "row_number": 8193,
+    "source": "AI4I validation split",
+    "reading": {
+      "air_temperature_k": 299.6,
+      "process_temperature_k": 310.9,
+      "rotational_speed_rpm": 1229,
+      "torque_nm": 65.2,
+      "tool_wear_min": 209,
+      "product_type": "L"
+    }
+  }
+]

@@ -1,6 +1,6 @@
 # Build checkpoint
 
-## Stages 1 and 2 implemented
+## Stages 1, 2 and 3 implemented
 
 - Four-tab Streamlit UI, fixed demo profile and FastAPI backend.
 - Input validation, SQLite persistence and idempotent manual incident creation.
@@ -9,11 +9,15 @@
 - Transactional acknowledge/inspect/resolve workflow with separate findings and source-labelled audit history.
 - Shared response logic, duplicate reply protection, fixed-recipient Twilio adapter and signed webhook checks.
 - Operator API key support, one-attempt notification reservation and no automatic retry after uncertain outcomes.
+- AI4I CSV with mirror provenance, four disjoint splits, calibrated logistic/tree candidates, validation-only selection, final-test metrics and a saved inference artifact.
+- Prediction API, real recorded demo inputs, stored incident assessment snapshots and an evaluation/reliability view.
+- XGBoost unavailable: histogram gradient boosting was used and labelled explicitly. Published-rule baseline outperformed the learned model on this synthetic benchmark.
 
 ## Verification in this environment
 
 - Python compilation passed.
 - Seven workflow/service tests passed, including simulated lifecycle, invalid ordering, reply collisions, missing credentials and mocked send deduplication/timeout handling.
+- Five ML tests passed: explicit feature allowlist, disjoint/reproducible splits, training-only preprocessing, real inference with immutable incident snapshots, and missing-artifact fallback.
 - Direct database checks passed: persistence, event deduplication and absent prediction values.
 - Schema checks exercised missing inputs, unsupported profile/product type, negative torque and extra target fields.
 - HTTP integration suite did not complete with the preinstalled FastAPI/TestClient stack; it was stopped. Rerun in the project virtual environment after dependencies install.
@@ -25,7 +29,7 @@ Install requirements, run `python -m unittest discover -s tests -v`, then launch
 
 Working directory: `C:\Workspace\AI-Projects\factory-copilot`.
 
-Remaining: live phone test, visual UI check, cross-event cooldown when automatic alerts are introduced, delivery callbacks, regional-language templates, and the Stage 3 ML pipeline.
+Remaining: live phone test, visual UI check, API integration validation, cross-event cooldown when automatic alerts are introduced, delivery callbacks, regional-language templates, and Stage 4 SHAP/source-backed guidance. Stage 3 training and direct inference ran successfully using preinstalled ML packages; full app dependencies remain unavailable.
 
 Remote repository: https://github.com/agilan-0110/factory-copilot
 

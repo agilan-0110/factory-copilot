@@ -1,0 +1,245 @@
+{
+  "model_version": "ai4i-hist_gradient_boosting-9841aaa04b-seed42-v1",
+  "selected_model": "hist_gradient_boosting",
+  "seed": 42,
+  "dataset_sha256": "9841aaa04b716d41ce9501f42d9388de7f571566608945061d026f95853c0337",
+  "selection": "Validation average precision, then Brier score; F2 threshold selected on validation only.",
+  "split_method": "Stratified random rows: 50% train / 20% calibration / 15% validation / 15% test. Not a machine or temporal holdout.",
+  "splits": {
+    "train": {
+      "count": 5000,
+      "failures": 169
+    },
+    "calibration": {
+      "count": 2000,
+      "failures": 68
+    },
+    "validation": {
+      "count": 1500,
+      "failures": 51
+    },
+    "test": {
+      "count": 1500,
+      "failures": 51
+    }
+  },
+  "validation": {
+    "logistic_regression": {
+      "average_precision": 0.3576233627764944,
+      "prevalence": 0.034,
+      "precision": 0.26126126126126126,
+      "recall": 0.5686274509803921,
+      "brier_score": 0.02653140786872578,
+      "confusion_matrix": [
+        [
+          1367,
+          82
+        ],
+        [
+          22,
+          29
+        ]
+      ],
+      "threshold": 0.12,
+      "sample_count": 1500,
+      "reliability": {
+        "mean_probability": [
+          0.0004052631632256743,
+          0.0011303087888965438,
+          0.0023692562269879897,
+          0.004379139509207985,
+          0.0077256672225828405,
+          0.01600982863446705,
+          0.03891206994737798,
+          0.20846238584586987
+        ],
+        "observed_fraction": [
+          0.005319148936170213,
+          0.0053475935828877,
+          0.015957446808510637,
+          0.0,
+          0.0106951871657754,
+          0.03723404255319149,
+          0.03208556149732621,
+          0.16489361702127658
+        ]
+      }
+    },
+    "hist_gradient_boosting": {
+      "average_precision": 0.7444887913939621,
+      "prevalence": 0.034,
+      "precision": 0.5970149253731343,
+      "recall": 0.7843137254901961,
+      "brier_score": 0.015048208276108145,
+      "confusion_matrix": [
+        [
+          1422,
+          27
+        ],
+        [
+          11,
+          40
+        ]
+      ],
+      "threshold": 0.21000000000000002,
+      "sample_count": 1500,
+      "reliability": {
+        "mean_probability": [
+          0.0003281009862766349,
+          0.0005933544425452465,
+          0.0008494630362150379,
+          0.0011491367086153795,
+          0.001553938808208234,
+          0.002425600931885687,
+          0.007264679034184959,
+          0.24973746731222893
+        ],
+        "observed_fraction": [
+          0.0,
+          0.0053475935828877,
+          0.010638297872340425,
+          0.0053475935828877,
+          0.0,
+          0.005319148936170213,
+          0.0106951871657754,
+          0.23404255319148937
+        ]
+      }
+    }
+  },
+  "test": {
+    "logistic_regression": {
+      "average_precision": 0.44132109947393067,
+      "prevalence": 0.034,
+      "precision": 0.3173076923076923,
+      "recall": 0.6470588235294118,
+      "brier_score": 0.024435201657419123,
+      "confusion_matrix": [
+        [
+          1378,
+          71
+        ],
+        [
+          18,
+          33
+        ]
+      ],
+      "threshold": 0.12,
+      "sample_count": 1500,
+      "reliability": {
+        "mean_probability": [
+          0.0003994811150359068,
+          0.0010334364653761168,
+          0.002182254380863096,
+          0.00414845754593782,
+          0.00787320220461114,
+          0.015263621530253452,
+          0.038661025344752346,
+          0.21469231376441542
+        ],
+        "observed_fraction": [
+          0.0,
+          0.0053475935828877,
+          0.0,
+          0.0053475935828877,
+          0.0106951871657754,
+          0.010638297872340425,
+          0.016042780748663103,
+          0.22340425531914893
+        ]
+      }
+    },
+    "hist_gradient_boosting": {
+      "average_precision": 0.8491986881460608,
+      "prevalence": 0.034,
+      "precision": 0.6615384615384615,
+      "recall": 0.8431372549019608,
+      "brier_score": 0.011145744738423696,
+      "confusion_matrix": [
+        [
+          1427,
+          22
+        ],
+        [
+          8,
+          43
+        ]
+      ],
+      "threshold": 0.21000000000000002,
+      "sample_count": 1500,
+      "reliability": {
+        "mean_probability": [
+          0.00033731965718150386,
+          0.000570432043268623,
+          0.0008340039908367624,
+          0.0011087279273827011,
+          0.0015143394743875904,
+          0.002451053166840764,
+          0.007416783614997971,
+          0.2590786660901736
+        ],
+        "observed_fraction": [
+          0.0,
+          0.0,
+          0.0,
+          0.0053475935828877,
+          0.0,
+          0.005319148936170213,
+          0.0053475935828877,
+          0.2553191489361702
+        ]
+      }
+    }
+  },
+  "engineering_rule": {
+    "average_precision": 0.9052941176470588,
+    "prevalence": 0.034,
+    "precision": 1.0,
+    "recall": 0.9019607843137255,
+    "brier_score": 0.0033333333333333335,
+    "confusion_matrix": [
+      [
+        1449,
+        0
+      ],
+      [
+        5,
+        46
+      ]
+    ],
+    "threshold": 0.5,
+    "sample_count": 1500,
+    "reliability": {
+      "mean_probability": [
+        0.0,
+        1.0
+      ],
+      "observed_fraction": [
+        0.0034387895460797797,
+        1.0
+      ]
+    }
+  },
+  "rule_limitation": "Partial reconstruction of published synthetic label rules; not calibrated probability or an independent industrial baseline.",
+  "candidate": "hist_gradient_boosting",
+  "threshold": 0.21000000000000002,
+  "features": [
+    "air_temperature_k",
+    "process_temperature_k",
+    "rotational_speed_rpm",
+    "torque_nm",
+    "tool_wear_min",
+    "product_type"
+  ],
+  "provenance": "Public GitHub mirror, blob 8548cc70c84635a6002eb0164a8c91eb4d8183e6; schema checked against UCI, not byte-verified against original.",
+  "limitations": [
+    "Synthetic benchmark only; not a future failure horizon.",
+    "Random-row splitting may benefit from correlated synthetic operating conditions.",
+    "Calibration uses only 20% of rows and does not establish field probabilities.",
+    "Test set has few failures; estimates may vary across other splits."
+  ],
+  "versions": {
+    "python": "3.10.11",
+    "sklearn": "1.7.2"
+  }
+}

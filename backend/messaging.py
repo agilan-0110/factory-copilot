@@ -16,8 +16,11 @@ def ready(settings):
 
 def message(incident):
     alert = incident['id']
+    score = incident.get('probability')
+    assessment = ('No trained model or failure probability.' if score is None else
+        f"Benchmark failure-label probability: {score:.1%}. Threshold: {incident['threshold']:.1%}. Not a future failure forecast.")
     return (f'Factory Copilot DEMO | {alert}\nProfile: ai4i-demo-v1\n'
-            'Manual test incident. No trained model or failure probability.\n'
+            f'Manually opened demo incident. {assessment}\n'
             'Technician assessment required.\nReply with alert ID and command:\n'
             f'{alert} 1 = acknowledge\n{alert} 2 = issue confirmed\n'
             f'{alert} 3 = no issue found\n{alert} 4 = inconclusive\n'

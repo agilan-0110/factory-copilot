@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Depends, Response
 from backend import database, workflow, messaging
 from backend.schemas import IncidentCreate, Reading, SimulatedReply
+from backend.prediction import Predictor
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def create_app(db_path=None):
     path = Path(db_path or os.environ.get("FACTORY_DB_PATH", ROOT / "runtime/factory.db"))
     settings = messaging.config()
+    predictor = Predictor(os.environ.get('FACTORY_MODEL_DIR', ROOT / 'ml/artifacts'))
 
     def operator(request: Request):
         key = settings['FACTORY_API_KEY']
@@ -30,16 +32,20 @@ def create_app(db_path=None):
         workflow.initialize(path)
         yield
 
-    app = FastAPI(title="Factory Copilot", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Factory Copilot", version="0.3.0", lifespan=lifespan)
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "stage": 2, "model_ready": False,
+        return {"status": "ok", "stage": 3, "model_ready": predictor.bundle is not None,
                 "messaging": "configured" if messaging.ready(settings) else "disabled"}
 
     @app.get("/profile", dependencies=[Depends(operator)])
     def profile():
-        return json.loads((ROOT / "config/demo_machine.json").read_text(encoding="utf-8"))
+        result = json.loads((ROOT / "config/demo_machine.json").read_text(encoding="utf-8"))
+        if predictor.bundle:
+            result.update(model_id=predictor.bundle['version'], alert_threshold=predictor.bundle['threshold'],
+                          dataset='AI4I 2020 public mirror; synthetic benchmark')
+        return result
 
     @app.post("/readings/validate", dependencies=[Depends(operator)])
     def validate(reading: Reading):
@@ -53,9 +59,31 @@ def create_app(db_path=None):
     @app.post("/incidents", dependencies=[Depends(operator)])
     def create_incident(request: IncidentCreate):
         try:
-            return database.create(path, request)
+            assessment = predictor.assess(request.reading) if predictor.bundle else None
+            return database.create(path, request, assessment)
         except ValueError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.post('/predict', dependencies=[Depends(operator)])
+    def predict(reading: Reading):
+        try:
+            return predictor.assess(reading)
+        except RuntimeError as error:
+            raise HTTPException(503, str(error)) from error
+
+    @app.get('/evaluation', dependencies=[Depends(operator)])
+    def evaluation():
+        try:
+            return predictor.document('metrics.json')
+        except RuntimeError as error:
+            raise HTTPException(503, str(error)) from error
+
+    @app.get('/samples', dependencies=[Depends(operator)])
+    def samples():
+        try:
+            return predictor.document('samples.json')
+        except RuntimeError as error:
+            raise HTTPException(503, str(error)) from error
 
     @app.get('/incidents/{incident_id}/history', dependencies=[Depends(operator)])
     def history(incident_id: str):
