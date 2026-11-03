@@ -6,6 +6,30 @@ export interface Reading {
   tool_wear_min: number;
   product_type: 'L' | 'M' | 'H';
   profile_id?: string;
+  machine_id?: string;
+}
+
+export interface MachineTelemetryHistory {
+  timestamp: string;
+  air_temperature_k: number;
+  process_temperature_k: number;
+  rotational_speed_rpm: number;
+  torque_nm: number;
+  tool_wear_min: number;
+  probability: number;
+}
+
+export interface FleetMachine {
+  machine_id: string;
+  name: string;
+  product_type: 'L' | 'M' | 'H';
+  status: 'nominal' | 'warning' | 'critical';
+  reading: Reading;
+  assessment?: AssessmentResult | null;
+  tool_wear_min: number;
+  fault_mode?: string | null;
+  active_incident_id?: string | null;
+  history: MachineTelemetryHistory[];
 }
 
 export interface Factor {

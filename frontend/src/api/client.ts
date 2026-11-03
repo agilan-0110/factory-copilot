@@ -6,6 +6,7 @@ import type {
   MachineProfile,
   EvaluationMetrics,
   ReplayEvent,
+  FleetMachine,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
@@ -37,6 +38,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const api = {
   getHealth: () => request<{ status: string; stage: number; model_ready: boolean; messaging: string }>('/health'),
   
+  getFleet: () => request<FleetMachine[]>('/fleet'),
+
+  tickFleet: () => request<FleetMachine[]>('/fleet/tick', { method: 'POST' }),
+
+  injectFault: (machine_id: string, mode?: string) =>
+    request<{ machine_id: string; mode?: string }>(`/fleet/machines/${machine_id}/inject-fault${mode ? `?mode=${mode}` : ''}`, {
+      method: 'POST',
+    }),
+
+  replaceTool: (machine_id: string) =>
+    request<{ machine_id: string; status: string }>(`/fleet/machines/${machine_id}/replace-tool`, {
+      method: 'POST',
+    }),
+
   getProfile: () => request<MachineProfile>('/profile'),
   
   validateReading: (reading: Reading) => 

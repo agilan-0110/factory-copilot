@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from backend import database, workflow, messaging, replay
+from backend.fleet import IndustrialFleet
 from backend.schemas import IncidentCreate, Reading, SimulatedReply, ExplanationRequest, ReplayRequest
 from backend.prediction import Predictor
 from backend.explanation import ModelExplainer
@@ -21,6 +22,7 @@ def create_app(db_path=None):
     settings = messaging.config()
     predictor = Predictor(os.environ.get('FACTORY_MODEL_DIR', ROOT / 'ml/artifacts'))
     explainer = ModelExplainer(predictor)
+    fleet = IndustrialFleet()
 
     def evidence(reading, scope='benchmark_reference'):
         result = predictor.assess(reading)
@@ -54,6 +56,29 @@ def create_app(db_path=None):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get('/fleet', dependencies=[Depends(operator)])
+    def get_fleet():
+        if predictor.bundle and not fleet.machines['M-01'].last_assessment:
+            fleet.tick_all(predictor, explainer, str(path))
+        return fleet.get_snapshot()
+
+    @app.post('/fleet/tick', dependencies=[Depends(operator)])
+    def tick_fleet():
+        if not predictor.bundle:
+            raise HTTPException(503, 'Model not trained.')
+        return fleet.tick_all(predictor, explainer, str(path))
+
+    @app.post('/fleet/machines/{machine_id}/inject-fault', dependencies=[Depends(operator)])
+    def inject_fault(machine_id: str, request: Request):
+        mode = request.query_params.get('mode')
+        fleet.inject_fault(machine_id, mode)
+        return {'machine_id': machine_id, 'mode': mode}
+
+    @app.post('/fleet/machines/{machine_id}/replace-tool', dependencies=[Depends(operator)])
+    def replace_tool(machine_id: str):
+        fleet.replace_tool(machine_id)
+        return {'machine_id': machine_id, 'status': 'tool_replaced'}
 
     @app.get("/health")
     def health():

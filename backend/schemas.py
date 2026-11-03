@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class Reading(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     profile_id: Literal["ai4i-demo-v1"] = "ai4i-demo-v1"
+    machine_id: str = Field(default="M-01", max_length=50)
     air_temperature_k: float = Field(gt=0, le=1000)
     process_temperature_k: float = Field(gt=0, le=1000)
     rotational_speed_rpm: float = Field(ge=0, le=100000)

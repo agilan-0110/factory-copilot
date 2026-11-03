@@ -6,6 +6,7 @@ import {
   BarChart3, 
   FileText, 
   MessageSquare,
+  Layers,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -62,6 +63,18 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Navigation Tabs */}
         <div className="flex space-x-2 -mb-px overflow-x-auto pt-1">
           <button
+            onClick={() => setActiveTab('fleet')}
+            className={`flex items-center space-x-2 py-2.5 px-4 border-b-2 text-sm font-medium transition-all ${
+              activeTab === 'fleet'
+                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Plant Fleet (10 Machines)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('monitor')}
             className={`flex items-center space-x-2 py-2.5 px-4 border-b-2 text-sm font-medium transition-all ${
               activeTab === 'monitor'
@@ -70,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>Live Monitor & Replay</span>
+            <span>Single Station Workbench</span>
           </button>
 
           <button

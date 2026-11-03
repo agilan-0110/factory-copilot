@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
+import { FleetOverview } from './components/FleetOverview';
 import { LiveMonitor } from './components/LiveMonitor';
 import { IncidentManager } from './components/IncidentManager';
 import { MachineProfileView } from './components/MachineProfileView';
@@ -8,7 +9,7 @@ import { api } from './api/client';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'monitor' | 'incidents' | 'profile' | 'evaluation'>('monitor');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'monitor' | 'incidents' | 'profile' | 'evaluation'>('fleet');
   const [health, setHealth] = useState<{ status: string; stage: number; model_ready: boolean; messaging: string } | null>(null);
   const [incidentCount, setIncidentCount] = useState<number>(0);
   const [backendError, setBackendError] = useState<string | null>(null);
@@ -62,6 +63,12 @@ export function App() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeTab === 'fleet' && (
+          <FleetOverview
+            onSelectMachineIncident={() => setActiveTab('incidents')}
+            onNavigateToIncidents={() => setActiveTab('incidents')}
+          />
+        )}
         {activeTab === 'monitor' && <LiveMonitor onIncidentCreated={fetchHealthAndIncidents} />}
         {activeTab === 'incidents' && <IncidentManager onRefresh={fetchHealthAndIncidents} />}
         {activeTab === 'profile' && <MachineProfileView />}
@@ -71,7 +78,7 @@ export function App() {
       <footer className="border-t border-slate-800/80 bg-slate-900/60 py-4 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <div>
-            <span>Factory Copilot • Predictive Maintenance Benchmark • AI4I 2020</span>
+            <span>Factory Copilot • Industrial Plant Fleet Management (10 Stations) • AI4I 2020</span>
           </div>
           <div className="flex items-center space-x-4">
             <span>FastAPI REST: <code className="text-slate-400">127.0.0.1:8000</code></span>
