@@ -337,7 +337,7 @@ class RAGAssistant:
         }
 
         # Try gemini-2.0-flash, then gemini-1.5-flash
-        models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+        models = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
         for model in models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key.strip()}"
             try:

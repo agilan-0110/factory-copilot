@@ -179,6 +179,7 @@ export interface ChatMessage {
   timestamp: string;
   sources?: KnowledgeDoc[];
   machineContext?: any;
+  mode?: string;
 }
 
 export interface ReplayEvent {

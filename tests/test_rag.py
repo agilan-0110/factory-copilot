@@ -10,11 +10,15 @@ class RAGTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / "test_rag.db"
+        self.env_file = Path(".env")
+        self.saved_env = self.env_file.read_text(encoding="utf-8") if self.env_file.exists() else None
         self.client = TestClient(create_app(self.path))
         self.client.__enter__()
 
     def tearDown(self):
         self.client.__exit__(None, None, None)
+        if self.saved_env is not None:
+            self.env_file.write_text(self.saved_env, encoding="utf-8")
         self.temp.cleanup()
 
     def test_knowledge_base_retrieval(self):
