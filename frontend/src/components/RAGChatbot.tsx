@@ -56,6 +56,7 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('factory_gemini_api_key') || '');
   const [tempKey, setTempKey] = useState<string>(apiKey);
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [serverRagConfig, setServerRagConfig] = useState<{ has_api_key: boolean; masked_key: string; mode: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +72,17 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
 
   useEffect(() => {
     loadKnowledge();
+    loadRagConfig();
   }, []);
+
+  const loadRagConfig = async () => {
+    try {
+      const cfg = await api.getRAGConfig();
+      setServerRagConfig(cfg);
+    } catch {
+      // ignore
+    }
+  };
 
   const loadKnowledge = async () => {
     try {
@@ -161,14 +172,14 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
               setShowKeyModal(true);
             }}
             className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center space-x-1.5 transition ${
-              apiKey
-                ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800 hover:bg-emerald-900/40'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+              (apiKey || serverRagConfig?.has_api_key)
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
             }`}
             title="Configure Gemini API Key"
           >
-            <Key className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline">{apiKey ? 'Gemini Active' : 'API Key'}</span>
+            <Key className="w-3 h-3 text-amber-500" />
+            <span className="hidden sm:inline">{(apiKey || serverRagConfig?.has_api_key) ? 'Gemini Active' : 'API Key'}</span>
           </button>
 
           <button
@@ -378,20 +389,37 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Enter a Google Gemini API key (<code className="text-blue-400 font-mono">AIzaSy...</code>) to power the copilot with Google Gemini. If omitted, the assistant seamlessly runs the offline deterministic grounded synthesizer.
+            {serverRagConfig?.has_api_key && (
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+                <div>
+                  <div className="font-semibold flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Configured in .env file</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-600 font-mono mt-0.5">
+                    GEMINI_API_KEY: {serverRagConfig.masked_key}
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded">
+                  ACTIVE
+                </span>
+              </div>
+            )}
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Enter your Google Gemini API key to power the copilot with live Gemini models. You can configure it here (saves directly to <code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">.env</code>) or set <code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">GEMINI_API_KEY</code> manually. If omitted, the copilot runs the offline grounded physics synthesizer.
             </p>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
                 Gemini API Key
               </label>
               <input
                 type="password"
                 value={tempKey}
                 onChange={(e) => setTempKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg text-slate-900 px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:border-blue-500"
+                placeholder={serverRagConfig?.has_api_key ? `Current: ${serverRagConfig.masked_key}` : "AIzaSy..."}
+                className="w-full bg-white border border-slate-300 rounded-lg text-slate-900 px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
@@ -400,27 +428,31 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[11px] text-blue-400 hover:underline flex items-center space-x-1"
+                className="text-[11px] text-blue-600 hover:underline flex items-center space-x-1 font-medium"
               >
                 <span>Get free key at Google AI Studio</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
               <div className="flex items-center space-x-2">
-                {apiKey && (
+                {(apiKey || serverRagConfig?.has_api_key) && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setApiKey('');
                       setTempKey('');
                       localStorage.removeItem('factory_gemini_api_key');
+                      try {
+                        const updated = await api.saveRAGConfig('');
+                        setServerRagConfig(updated);
+                      } catch {}
                       setShowKeyModal(false);
                     }}
-                    className="px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-950/40 rounded-lg border border-rose-900/60 transition"
+                    className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition"
                   >
                     Remove
                   </button>
                 )}
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const clean = tempKey.trim();
                     setApiKey(clean);
                     if (clean) {
@@ -428,11 +460,15 @@ export const RAGChatbot: React.FC<RAGChatbotProps> = ({
                     } else {
                       localStorage.removeItem('factory_gemini_api_key');
                     }
+                    try {
+                      const updated = await api.saveRAGConfig(clean);
+                      setServerRagConfig(updated);
+                    } catch {}
                     setShowKeyModal(false);
                   }}
-                  className="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg shadow transition"
+                  className="px-4 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition"
                 >
-                  Save Key
+                  Save to .env
                 </button>
               </div>
             </div>

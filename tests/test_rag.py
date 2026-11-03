@@ -40,6 +40,22 @@ class RAGTests(unittest.TestCase):
         self.assertIn("M-01", data["reply"])
         self.assertEqual(data["machine_context"]["machine_id"], "M-01")
 
+    def test_rag_config_endpoints(self):
+        # GET config
+        res = self.client.get("/rag/config")
+        self.assertEqual(res.status_code, 200)
+        cfg = res.json()
+        self.assertIn("has_api_key", cfg)
+        self.assertIn("mode", cfg)
+
+        # POST config to set new key
+        post_res = self.client.post("/rag/config", json={"api_key": "AIzaSyTestKey123456789"})
+        self.assertEqual(post_res.status_code, 200)
+        updated = post_res.json()
+        self.assertTrue(updated["has_api_key"])
+        self.assertEqual(updated["mode"], "gemini_llm")
+        self.assertIn("AIzaSy", updated["masked_key"])
+
 
 if __name__ == "__main__":
     unittest.main()

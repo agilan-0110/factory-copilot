@@ -1,5 +1,6 @@
 """RAG (Retrieval-Augmented Generation) engine for Factory Copilot technical maintenance."""
 import os
+from pathlib import Path
 import re
 from typing import Dict, List, Optional
 import requests
@@ -200,6 +201,28 @@ class RAGAssistant:
             return self.docs[:top_k]
         return [item[1] for item in scored[:top_k]]
 
+    @staticmethod
+    def get_configured_key(api_key: Optional[str] = None) -> str:
+        if api_key and api_key.strip():
+            return api_key.strip()
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if key and key.strip():
+            return key.strip()
+        for env_path in [Path(".env"), Path("../.env")]:
+            if env_path.exists():
+                try:
+                    for line in env_path.read_text(encoding="utf-8").splitlines():
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            if k.strip() in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+                                v = v.strip().strip("'\"")
+                                if v:
+                                    return v
+                except Exception:
+                    pass
+        return ""
+
     def answer(self, query: str, machine_context: Optional[dict] = None, fleet_context: Optional[List[dict]] = None, api_key: Optional[str] = None) -> dict:
         """Synthesize a grounded answer using retrieved documents, live machine context, and optional Gemini LLM."""
         retrieved = self.retrieve(query, machine_context, top_k=3)
@@ -213,7 +236,7 @@ class RAGAssistant:
                     break
 
         # Check if Gemini API key is available (passed directly or from environment)
-        resolved_key = (api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+        resolved_key = self.get_configured_key(api_key)
         if resolved_key:
             try:
                 llm_response = self._call_gemini_llm(query, retrieved, target_machine, resolved_key)

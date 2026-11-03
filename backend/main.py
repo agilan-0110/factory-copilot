@@ -18,6 +18,27 @@ from backend.guidance import retrieve
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def update_env_file(updates: dict):
+    env_path = ROOT / '.env'
+    lines = []
+    keys_written = set()
+    if env_path.exists():
+        for line in env_path.read_text(encoding='utf-8').splitlines():
+            line_str = line.strip()
+            if line_str and not line_str.startswith('#') and '=' in line_str:
+                k, _ = line_str.split('=', 1)
+                k = k.strip()
+                if k in updates:
+                    lines.append(f"{k}={updates[k]}")
+                    keys_written.add(k)
+                    continue
+            lines.append(line)
+    for k, v in updates.items():
+        if k not in keys_written:
+            lines.append(f"{k}={v}")
+    env_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
 
 def create_app(db_path=None):
     path = Path(db_path or os.environ.get("FACTORY_DB_PATH", ROOT / "runtime/factory.db"))
@@ -128,6 +149,24 @@ def create_app(db_path=None):
             }
         fleet_ctx = fleet.get_snapshot()
         return rag.answer(message, machine_ctx, fleet_ctx, api_key=api_key)
+
+    @app.get('/rag/config', dependencies=[Depends(operator)])
+    def get_rag_config():
+        configured_key = rag.get_configured_key()
+        masked = (configured_key[:6] + '...' + configured_key[-4:]) if len(configured_key) > 10 else ('***' if configured_key else '')
+        return {
+            'has_api_key': bool(configured_key),
+            'masked_key': masked,
+            'mode': 'gemini_llm' if configured_key else 'offline_rag'
+        }
+
+    @app.post('/rag/config', dependencies=[Depends(operator)])
+    async def set_rag_config(request: Request):
+        body = await request.json()
+        new_key = body.get('api_key', '').strip()
+        update_env_file({'GEMINI_API_KEY': new_key})
+        os.environ['GEMINI_API_KEY'] = new_key
+        return get_rag_config()
 
     @app.get('/rag/knowledge', dependencies=[Depends(operator)])
     def get_knowledge():
@@ -262,16 +301,14 @@ def create_app(db_path=None):
         if body.get('webhook_url'): current['TWILIO_WEBHOOK_URL'] = body['webhook_url'].strip()
         if body.get('api_key'): current['FACTORY_API_KEY'] = body['api_key'].strip()
 
-        lines = [
-            "# Factory Copilot Environment Configuration",
-            f"TWILIO_ACCOUNT_SID={current['TWILIO_ACCOUNT_SID']}",
-            f"TWILIO_AUTH_TOKEN={current['TWILIO_AUTH_TOKEN']}",
-            f"TWILIO_WHATSAPP_FROM={current['TWILIO_WHATSAPP_FROM']}",
-            f"DEMO_WHATSAPP_TO={current['DEMO_WHATSAPP_TO']}",
-            f"TWILIO_WEBHOOK_URL={current['TWILIO_WEBHOOK_URL']}",
-            f"FACTORY_API_KEY={current['FACTORY_API_KEY']}",
-        ]
-        env_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        update_env_file({
+            'TWILIO_ACCOUNT_SID': current['TWILIO_ACCOUNT_SID'],
+            'TWILIO_AUTH_TOKEN': current['TWILIO_AUTH_TOKEN'],
+            'TWILIO_WHATSAPP_FROM': current['TWILIO_WHATSAPP_FROM'],
+            'DEMO_WHATSAPP_TO': current['DEMO_WHATSAPP_TO'],
+            'TWILIO_WEBHOOK_URL': current['TWILIO_WEBHOOK_URL'],
+            'FACTORY_API_KEY': current['FACTORY_API_KEY'],
+        })
         return whatsapp_status()
 
     @app.post('/whatsapp/test-send', dependencies=[Depends(operator)])

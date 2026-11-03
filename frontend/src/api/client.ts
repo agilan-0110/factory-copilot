@@ -136,6 +136,15 @@ export const api = {
 
   getKnowledge: () => request<any[]>('/rag/knowledge'),
 
+  getRAGConfig: () =>
+    request<{ has_api_key: boolean; masked_key: string; mode: string }>('/rag/config'),
+
+  saveRAGConfig: (apiKey: string) =>
+    request<{ has_api_key: boolean; masked_key: string; mode: string }>('/rag/config', {
+      method: 'POST',
+      body: JSON.stringify({ api_key: apiKey }),
+    }),
+
   getWhatsAppStatus: () => request<WhatsAppStatus>('/whatsapp/status'),
 
   saveWhatsAppConfig: (config: {
