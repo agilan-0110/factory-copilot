@@ -4,3 +4,5 @@ __pycache__/
 .env
 runtime/
 .pytest_cache/
+node_modules/
+dist/

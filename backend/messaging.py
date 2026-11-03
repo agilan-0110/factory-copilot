@@ -22,7 +22,7 @@ def message(incident):
     factors = incident.get('model_evidence') or []
     factor_text = ', '.join(item['feature'] for item in factors[:3]) or 'Unavailable'
     return (f'Factory Copilot DEMO | {alert}\nProfile: ai4i-demo-v1\n'
-            f'Manually opened demo incident. {assessment}\n'
+            f'Synthetic benchmark demo incident. {assessment}\n'
             f'Top model factors (not causes): {factor_text}\n'
             'No equipment-specific procedure validated. Review source evidence in the dashboard.\n'
             'Technician assessment required.\nReply with alert ID and command:\n'
@@ -51,3 +51,27 @@ def send(path, incident_id, settings, client=None):
         raise RuntimeError('Provider outcome unknown. Check Twilio logs; automatic resend is blocked.') from None
     workflow.finish_notification(path, incident_id, 'provider_accepted', response.sid)
     return {'status': 'provider_accepted', 'duplicate': False}
+
+
+def refresh_delivery(path, incident_id, settings, client=None):
+    from backend.database import connect
+    if not ready(settings):
+        raise RuntimeError('WhatsApp is not configured.')
+    with connect(path) as db:
+        row = db.execute('SELECT provider_sid FROM notifications WHERE incident_id=?', (incident_id,)).fetchone()
+    if not row or not row['provider_sid']:
+        raise ValueError('No provider message ID is available. Check Twilio logs for uncertain attempts.')
+    if client is None:
+        from twilio.rest import Client
+        from twilio.http.http_client import TwilioHttpClient
+        client = Client(settings['TWILIO_ACCOUNT_SID'], settings['TWILIO_AUTH_TOKEN'],
+            http_client=TwilioHttpClient(timeout=10, max_retries=0))
+    try:
+        state = client.messages(row['provider_sid']).fetch().status
+    except Exception:
+        raise RuntimeError('Unable to refresh provider status; existing state preserved.') from None
+    allowed = {'queued', 'sending', 'sent', 'delivered', 'read', 'failed', 'undelivered', 'canceled'}
+    if state not in allowed:
+        raise RuntimeError('Provider returned an unsupported status; existing state preserved.')
+    workflow.finish_notification(path, incident_id, state, row['provider_sid'])
+    return {'status': state, 'source': 'twilio_status_lookup'}

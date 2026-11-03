@@ -52,6 +52,41 @@ monitor, incidents, profile, evaluation = st.tabs(["Monitor", "Incidents", "Mach
 
 with monitor:
     st.subheader("Demonstration station")
+    if health.get('model_ready'):
+        st.markdown('**Recorded-sample replay**')
+        st.caption('Two validation samples, low then high score. Replay order is not a physical machine timeline. Flagged readings open or link an incident; phone sending remains a separate explicit action.')
+        start, stop = st.columns(2)
+        if start.button('Play two-sample demo'):
+            st.session_state.replay_queue = [(uuid4().hex, s) for s in ['low_score', 'high_score']]
+            st.session_state.replay_active = True
+        if stop.button('Pause replay'):
+            st.session_state.replay_active = False
+
+        @st.fragment(run_every=2 if st.session_state.get('replay_active') else None)
+        def playback():
+            queue = st.session_state.get('replay_queue', [])
+            if st.session_state.get('replay_active') and queue:
+                event_id, scenario = queue[0]
+                result = api('POST', '/replay', {'event_id': event_id, 'scenario': scenario})
+                if result:
+                    st.session_state.replay_last = result
+                    st.session_state.replay_queue = queue[1:]
+                else:
+                    st.session_state.replay_active = False
+                    st.rerun()
+                if not st.session_state.replay_queue:
+                    st.session_state.replay_active = False
+                    st.rerun()
+            if st.session_state.get('replay_last'):
+                result = st.session_state.replay_last
+                st.write(f"Replay outcome: **{result['action']}** | Sample: {result['scenario']}")
+                st.write(f"Benchmark score: {result['assessment']['probability']:.1%} | Incident: {result['incident_id'] or 'None'}")
+                st.caption('Incident evidence preserves the reading that opened it; linked samples do not replace that original snapshot.')
+        playback()
+        with st.expander('Replay history (latest 50 events)'):
+            events = api('GET', '/replay') or []
+            st.table([{'scenario': e['scenario'], 'action': e['action'],
+                'incident': e['incident_id'], 'score': e['assessment']['probability']} for e in events])
     st.write("Enter readings to validate the input contract and create a manual test incident.")
     st.caption("Defaults are illustrative inputs, not recorded AI4I samples. Validation checks format and broad bounds, not model compatibility with physical equipment.")
     preset = {}
@@ -140,11 +175,21 @@ with incidents:
                 trail = api('GET', f"/incidents/{item['id']}/history")
                 st.json(trail or [])
             if item['delivery_status'] == 'not_sent' and item['status'] != 'resolved':
+                if st.button('Preview notification (no sending)', key='preview-'+item['id']):
+                    preview = api('GET', f"/incidents/{item['id']}/notification-preview")
+                    if preview:
+                        st.caption('Preview only. No delivery has occurred.')
+                        st.text(preview['text'])
                 if st.button('Send WhatsApp demo alert', key='notify-'+item['id']):
                     result = api('POST', f"/incidents/{item['id']}/notify")
                     if result:
                         st.rerun()
-            st.caption('WhatsApp requires local configuration. Provider acceptance is not confirmed phone delivery. Unknown outcomes require checking provider logs; automatic resends are blocked.')
+            if item['delivery_status'] not in ('not_sent', 'unknown'):
+                if st.button('Refresh provider delivery status', key='delivery-'+item['id']):
+                    status = api('POST', f"/incidents/{item['id']}/refresh-delivery")
+                    if status:
+                        st.rerun()
+            st.caption('Preview does not send. Provider acceptance is not confirmed delivery; refresh queries Twilio. Unknown outcomes require checking provider logs; automatic resends are blocked.')
 
 with profile:
     st.subheader("Supported profile")

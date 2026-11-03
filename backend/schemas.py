@@ -29,3 +29,9 @@ class ExplanationRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     reading: Reading
     scope: Literal['benchmark_reference', 'equipment_specific'] = 'benchmark_reference'
+
+
+class ReplayRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    event_id: str = Field(min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9_-]+$')
+    scenario: Literal['low_score', 'high_score']

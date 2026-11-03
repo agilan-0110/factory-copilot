@@ -6,8 +6,9 @@ from urllib.parse import parse_qs
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Depends, Response
-from backend import database, workflow, messaging
-from backend.schemas import IncidentCreate, Reading, SimulatedReply, ExplanationRequest
+from fastapi.middleware.cors import CORSMiddleware
+from backend import database, workflow, messaging, replay
+from backend.schemas import IncidentCreate, Reading, SimulatedReply, ExplanationRequest, ReplayRequest
 from backend.prediction import Predictor
 from backend.explanation import ModelExplainer
 from backend.guidance import retrieve
@@ -29,24 +30,34 @@ def create_app(db_path=None):
         return result
 
     def operator(request: Request):
+        if request.method == "OPTIONS":
+            return
         key = settings['FACTORY_API_KEY']
         if key:
             if not hmac.compare_digest(request.headers.get('X-API-Key', ''), key):
                 raise HTTPException(401, 'Operator API key required.')
-        elif request.client is None or request.client.host not in ('127.0.0.1', '::1', 'testclient'):
+        elif request.client is None or request.client.host not in ('127.0.0.1', '::1', 'testclient', 'localhost'):
             raise HTTPException(403, 'Without an API key, operator access is local only.')
 
     @asynccontextmanager
     async def lifespan(app):
         database.initialize(path)
         workflow.initialize(path)
+        replay.initialize(path)
         yield
 
-    app = FastAPI(title="Factory Copilot", version="0.4.0", lifespan=lifespan)
+    app = FastAPI(title="Factory Copilot", version="0.5.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "stage": 4, "model_ready": predictor.bundle is not None,
+        return {"status": "ok", "stage": 5, "model_ready": predictor.bundle is not None,
                 "messaging": "configured" if messaging.ready(settings) else "disabled"}
 
     @app.get("/profile", dependencies=[Depends(operator)])
@@ -55,6 +66,8 @@ def create_app(db_path=None):
         if predictor.bundle:
             result.update(model_id=predictor.bundle['version'], alert_threshold=predictor.bundle['threshold'],
                           dataset='AI4I 2020 public mirror; synthetic benchmark')
+        result.update(messaging_mode='configured' if messaging.ready(settings) else 'disabled',
+            replay_cooldown_seconds=300, guidance_sources=['UCI AI4I', 'Haas educational references'])
         return result
 
     @app.post("/readings/validate", dependencies=[Depends(operator)])
@@ -102,6 +115,31 @@ def create_app(db_path=None):
         except RuntimeError as error:
             raise HTTPException(503, str(error)) from error
 
+    @app.post('/replay', dependencies=[Depends(operator)])
+    def replay_sample(body: ReplayRequest):
+        try:
+            sample = next(s for s in predictor.document('samples.json') if s['name'] == body.scenario)
+            reading = Reading(**sample['reading'])
+            return replay.process(path, body.event_id, body.scenario, reading, evidence(reading))
+        except StopIteration as error:
+            raise HTTPException(404, 'Recorded scenario unavailable.') from error
+        except RuntimeError as error:
+            raise HTTPException(503, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+
+    @app.get('/replay', dependencies=[Depends(operator)])
+    def replay_history():
+        return replay.history(path)
+
+    @app.get('/incidents/{incident_id}/notification-preview', dependencies=[Depends(operator)])
+    def preview(incident_id: str):
+        incident = next((i for i in database.list_incidents(path) if i['id'] == incident_id), None)
+        if not incident:
+            raise HTTPException(404, 'Incident not found.')
+        return {'mode': 'preview_only', 'text': messaging.message(incident),
+                'configured': messaging.ready(settings)}
+
     @app.get('/incidents/{incident_id}/history', dependencies=[Depends(operator)])
     def history(incident_id: str):
         try:
@@ -124,6 +162,15 @@ def create_app(db_path=None):
             return messaging.send(path, incident_id, settings)
         except LookupError as error:
             raise HTTPException(404, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        except (RuntimeError, ImportError) as error:
+            raise HTTPException(503, str(error)) from error
+
+    @app.post('/incidents/{incident_id}/refresh-delivery', dependencies=[Depends(operator)])
+    def refresh_delivery(incident_id: str):
+        try:
+            return messaging.refresh_delivery(path, incident_id, settings)
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
         except (RuntimeError, ImportError) as error:
@@ -163,6 +210,11 @@ def create_app(db_path=None):
             # Acknowledge invalid user commands without provoking provider retries.
             return Response('<Response/>', media_type='application/xml')
         return Response('<Response/>', media_type='application/xml')
+
+    dist_path = ROOT / "frontend/dist"
+    if dist_path.exists():
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
 
     return app
 

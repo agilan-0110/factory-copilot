@@ -4,7 +4,7 @@ Stage 4: benchmark classification with SHAP explanations and source-labelled ref
 
 **Synthetic benchmark demonstration only. Not validated for physical equipment.** Model scores come from a trained classifier. Named low/high scenarios are actual validation rows. Incidents are manually opened; the backend stores its assessment, explanation and evidence snapshot. WhatsApp requires configuration and an explicit send action. Retrieved references are not equipment-specific repair procedures.
 
-## Run on Windows (Python 3.10+)
+## Run on Windows (Python 3.10+ & Node.js)
 
 From this project directory:
 
@@ -20,7 +20,15 @@ In a second terminal in the same directory:
 .\.venv\Scripts\python.exe -m streamlit run ui/app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-Open http://127.0.0.1:8501. API documentation: http://127.0.0.1:8000/docs.
+Open **http://127.0.0.1:8000** to access the modern React industrial dashboard (served directly by FastAPI). API documentation: http://127.0.0.1:8000/docs.
+
+For frontend hot-reload development (optional):
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+Open http://127.0.0.1:5173. The legacy Streamlit interface remains runnable via `.\.venv\Scripts\python.exe -m streamlit run ui/app.py`.
 
 Validate a reading, create a manual incident, and open Incidents. Repeated creation for the same validated event returns the same incident. Revalidating begins a new event. Backend errors are shown in the interface.
 

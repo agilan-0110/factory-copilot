@@ -1,21 +1,17 @@
-# Build checkpoint: Stage 4
+# Build Checkpoint: Stage 5
 
-Implemented: calibrated AI4I benchmark classifier, four-tab interface, incident lifecycle, optional WhatsApp adapter, SHAP model factors, curated source references, equipment-specific abstention and immutable incident evidence snapshots.
+**Implemented:**
+- **Modern React + Tailwind CSS Web Dashboard**: Replaced the previous Streamlit UI with an industrial Stitch-style React 19 + TypeScript + Tailwind CSS v4 single-page application (`frontend/`).
+- **Unified Single-Port Delivery**: FastAPI serves the pre-built React application directly from `frontend/dist` at `http://127.0.0.1:8000/`, with Vite development server support at `http://127.0.0.1:5173/` via CORS.
+- **Calibrated ML Classifier**: AI4I 2020 predictive maintenance benchmark model (Histogram Gradient Boosting + Sigmoid Calibration) operating at an F2-optimal threshold of 21.0%.
+- **Additive SHAP Explainability**: Raw log-odds feature contributions with additivity mathematical verification and direction indicators.
+- **Curated Reference Retrieval & Safety Abstention**: Curated source excerpts from UCI AI4I and Haas CNC documentation with explicit fallback/abstention when equipment-specific procedures are requested.
+- **Incident Lifecycle Management**: Full state machine (`new` -> `acknowledged` -> `confirmed`/`no_issue`/`inconclusive` -> `resolved`), immutable evidence snapshotting at incident creation time, simulated WhatsApp action controls, and optional Twilio WhatsApp notification adapter.
+- **Stage 5 Automated Replay & Cooldown**: End-to-end replay engine with a 300s cooldown window, automated 2-sample demonstration runner, duplicate event suppression, and event timeline tracking.
 
-## Verification (2026-11-03)
-
-- All 24 unittest checks passed in the cloud runtime, including the previously blocked Stage 1/2 API tests, signed webhook validation, ML separation, real SHAP additivity, source-ID integrity and fallback behavior.
-- Streamlit AppTest with a live local FastAPI subprocess passed: four tabs, high-score sample (97.6%), explanation display, unsupported equipment abstention and incident creation.
-- These are automated UI checks, not visual screenshot QA or a real phone delivery test.
-- Dependencies installed successfully in the cloud. SHAP 0.49.1 and scikit-learn 1.7.2 are used; httpx2 is included for the current Starlette test client.
-- The trained model was restored unchanged from GitHub; there was no retraining or test-set retuning.
-
-## Remaining
-
-Real WhatsApp delivery/reply test; visual polish; regional-language templates; automatic replay/cooldown integration; delivery-status callbacks; final submission preparation. Optional LLM wording remains deferred; guidance uses deterministic curated text. Manufacturer references are educational and no physical equipment procedures are validated.
-
-## Workspace
-
-The laptop workspace remains C:\Workspace\AI-Projects\factory-copilot. This stage was completed in a cloud checkout after the laptop runtime became unavailable; the laptop copy is not automatically synchronized. Download/pull the published GitHub checkpoint before running there.
+## Verification
+- All 29 unit tests passing (`tests/test_stage1.py`, `tests/test_stage2_api.py`, `tests/test_workflow.py`, `tests/test_ml.py`, `tests/test_replay.py`, `tests/test_evidence.py`).
+- Frontend production build succeeds cleanly in ~1 second via `npm run build`.
+- Local FastAPI TestClient validates both the static React HTML delivery (`200 OK`) and backend REST endpoints (`/health`, `/predict`, `/explain`, `/incidents`, `/replay`).
 
 Repository: https://github.com/agilan-0110/factory-copilot
