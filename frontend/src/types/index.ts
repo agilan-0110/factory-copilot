@@ -190,3 +190,14 @@ export interface ReplayEvent {
   };
   created_at?: string;
 }
+
+export interface WhatsAppStatus {
+  ready: boolean;
+  account_sid: string;
+  auth_token_set: boolean;
+  from_number: string;
+  to_number: string;
+  webhook_url: string;
+  factory_api_key_set: boolean;
+  missing: string[];
+}

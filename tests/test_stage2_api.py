@@ -57,3 +57,12 @@ class StageTwoApiTests(unittest.TestCase):
                 trail = client.get(f'/incidents/{alert}/history', headers={'X-API-Key': 'test-key'}).json()
                 self.assertEqual(len(trail), 1)
                 self.assertEqual(trail[0]['source'], 'whatsapp')
+
+    def test_whatsapp_status_endpoint(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {'FACTORY_API_KEY': ''}):
+            with TestClient(create_app(Path(folder) / 'test.db')) as client:
+                res = client.get('/whatsapp/status')
+                self.assertEqual(res.status_code, 200)
+                data = res.json()
+                self.assertIn('ready', data)
+                self.assertIn('missing', data)

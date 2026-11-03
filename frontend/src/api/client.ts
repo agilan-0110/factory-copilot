@@ -7,6 +7,7 @@ import type {
   EvaluationMetrics,
   ReplayEvent,
   FleetMachine,
+  WhatsAppStatus,
 } from '../types';
 
 const API_BASE = '';
@@ -120,4 +121,24 @@ export const api = {
     }),
 
   getKnowledge: () => request<any[]>('/rag/knowledge'),
+
+  getWhatsAppStatus: () => request<WhatsAppStatus>('/whatsapp/status'),
+
+  saveWhatsAppConfig: (config: {
+    account_sid?: string;
+    auth_token?: string;
+    from_number?: string;
+    to_number?: string;
+    webhook_url?: string;
+    api_key?: string;
+  }) =>
+    request<WhatsAppStatus>('/whatsapp/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  testWhatsAppSend: () =>
+    request<{ status: string; sid: string }>('/whatsapp/test-send', {
+      method: 'POST',
+    }),
 };

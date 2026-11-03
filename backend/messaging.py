@@ -1,12 +1,29 @@
 import os
 import re
+from pathlib import Path
 from backend import workflow
 
 
 def config():
-    return {key: os.environ.get(key, '') for key in (
-        'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM',
-        'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL', 'FACTORY_API_KEY')}
+    env_file = Path('.env')
+    loaded = {}
+    if env_file.exists():
+        try:
+            for line in env_file.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    loaded[k.strip()] = v.strip().strip("'\"")
+        except Exception:
+            pass
+    res = {}
+    for key in ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM',
+                'DEMO_WHATSAPP_TO', 'TWILIO_WEBHOOK_URL', 'FACTORY_API_KEY'):
+        if key in os.environ:
+            res[key] = os.environ[key]
+        else:
+            res[key] = loaded.get(key, '')
+    return res
 
 
 def ready(settings):
@@ -75,3 +92,24 @@ def refresh_delivery(path, incident_id, settings, client=None):
         raise RuntimeError('Provider returned an unsupported status; existing state preserved.')
     workflow.finish_notification(path, incident_id, state, row['provider_sid'])
     return {'status': state, 'source': 'twilio_status_lookup'}
+
+
+def test_send(settings, client=None):
+    if not ready(settings):
+        raise RuntimeError('WhatsApp is not fully configured.')
+    if client is None:
+        from twilio.rest import Client
+        from twilio.http.http_client import TwilioHttpClient
+        client = Client(settings['TWILIO_ACCOUNT_SID'], settings['TWILIO_AUTH_TOKEN'],
+                        http_client=TwilioHttpClient(timeout=10, max_retries=0))
+    test_body = (
+        "🤖 Factory Copilot DEMO | WhatsApp Alert\n"
+        "WhatsApp channel verified!\n"
+        "10-Machine plant telemetry alerts and technician lifecycle commands (1-5) are active."
+    )
+    response = client.messages.create(
+        from_=settings['TWILIO_WHATSAPP_FROM'],
+        to=settings['DEMO_WHATSAPP_TO'],
+        body=test_body
+    )
+    return {'status': 'provider_accepted', 'sid': response.sid}

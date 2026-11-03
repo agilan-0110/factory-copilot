@@ -8,9 +8,14 @@ import {
   AlertCircle,
   FileSearch,
   History,
+  Settings,
+  ExternalLink,
+  X,
+  Smartphone,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../api/client';
-import type { Incident, AuditEvent } from '../types';
+import type { Incident, AuditEvent, WhatsAppStatus } from '../types';
 
 interface IncidentManagerProps {
   onRefresh: () => void;
@@ -24,10 +29,67 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
   const [loading, setLoading] = useState(false);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [waForm, setWaForm] = useState({
+    account_sid: '',
+    auth_token: '',
+    from_number: 'whatsapp:+14155238886',
+    to_number: '',
+    webhook_url: '',
+    api_key: '',
+  });
+  const [waTestStatus, setWaTestStatus] = useState<{ loading: boolean; message: string; error?: boolean } | null>(null);
 
   useEffect(() => {
     loadIncidents();
+    loadWhatsAppStatus();
   }, []);
+
+  const loadWhatsAppStatus = async () => {
+    try {
+      const s = await api.getWhatsAppStatus();
+      setWhatsAppStatus(s);
+      setWaForm(prev => ({
+        ...prev,
+        from_number: s.from_number || 'whatsapp:+14155238886',
+        to_number: s.to_number || '',
+        webhook_url: s.webhook_url || '',
+      }));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveWhatsAppConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = await api.saveWhatsAppConfig(waForm);
+      setWhatsAppStatus(updated);
+      setActionMessage({ type: 'success', text: 'WhatsApp configuration saved to .env!' });
+      setShowWhatsAppModal(false);
+    } catch (err: any) {
+      setActionMessage({ type: 'error', text: err.message || 'Failed to save configuration.' });
+    }
+  };
+
+  const handleTestWhatsAppPing = async () => {
+    setWaTestStatus({ loading: true, message: 'Sending test ping via Twilio...' });
+    try {
+      const res = await api.testWhatsAppSend();
+      setWaTestStatus({
+        loading: false,
+        message: `Test alert sent successfully! SID: ${res.sid.slice(0, 10)}...`,
+        error: false,
+      });
+    } catch (err: any) {
+      setWaTestStatus({
+        loading: false,
+        message: `Failed: ${err.message || 'Check credentials'}`,
+        error: true,
+      });
+    }
+  };
 
   const loadIncidents = async () => {
     setLoading(true);
@@ -150,6 +212,69 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
 
   return (
     <div className="space-y-6">
+      {/* WhatsApp Integration Channel Banner */}
+      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            whatsAppStatus?.ready
+              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-md shadow-emerald-500/10'
+              : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+          }`}>
+            <MessageSquare className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-sm font-bold text-white">Twilio WhatsApp Notification Channel</h3>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold font-mono border ${
+                whatsAppStatus?.ready
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                  : 'bg-amber-950 text-amber-300 border-amber-800'
+              }`}>
+                {whatsAppStatus?.ready ? 'CONNECTED & READY' : 'SETUP REQUIRED'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {whatsAppStatus?.ready
+                ? `Active WhatsApp alert delivery to technician ${whatsAppStatus.to_number} (From: ${whatsAppStatus.from_number})`
+                : 'Connect your Twilio WhatsApp Sandbox to receive real-time plant alerts and reply with commands 1–5 from your phone'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2.5">
+          {whatsAppStatus?.ready && (
+            <button
+              onClick={handleTestWhatsAppPing}
+              disabled={waTestStatus?.loading}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center space-x-1.5 transition disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{waTestStatus?.loading ? 'Sending...' : 'Send Test Ping'}</span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowWhatsAppModal(true)}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md flex items-center space-x-1.5 transition"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>{whatsAppStatus?.ready ? 'Configure Channel' : 'Setup WhatsApp'}</span>
+          </button>
+        </div>
+      </div>
+
+      {waTestStatus && (
+        <div className={`p-3 rounded-lg text-xs font-mono border flex items-center justify-between ${
+          waTestStatus.error
+            ? 'bg-rose-950/40 border-rose-800 text-rose-300'
+            : 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
+        }`}>
+          <span>{waTestStatus.message}</span>
+          <button onClick={() => setWaTestStatus(null)} className="text-slate-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
@@ -490,6 +615,162 @@ export const IncidentManager: React.FC<IncidentManagerProps> = ({ onRefresh }) =
           )}
         </div>
       </div>
+
+      {/* WhatsApp Configuration Modal */}
+      {showWhatsAppModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-150 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Twilio WhatsApp Channel Configuration</h3>
+                  <p className="text-[11px] text-slate-400">Deploy alerts to mobile technicians via WhatsApp sandbox</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWhatsAppModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Setup Guide */}
+            <div className="p-3.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-300 space-y-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Twilio WhatsApp Sandbox Setup Guide</span>
+              </span>
+              <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px] leading-relaxed">
+                <li>Log in to <a href="https://console.twilio.com/" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Twilio Console</a> and open <strong>Messaging &gt; Try it out &gt; Send a WhatsApp message</strong>.</li>
+                <li>From your mobile phone WhatsApp, send the sandbox join keyword to <code className="text-emerald-300 font-mono">+1 415 523 8886</code>.</li>
+                <li>Copy your <strong>Account SID</strong> and <strong>Auth Token</strong> below.</li>
+                <li>To enable two-way replies (Commands 1–5), forward port 8000 using ngrok (<code className="text-cyan-300 font-mono">ngrok http 8000</code>) and set the Twilio sandbox webhook to <code className="text-cyan-300 font-mono">https://&lt;subdomain&gt;.ngrok-free.app/webhooks/whatsapp</code>.</li>
+              </ol>
+            </div>
+
+            <form onSubmit={handleSaveWhatsAppConfig} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Twilio Account SID
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    value={waForm.account_sid}
+                    onChange={(e) => setWaForm({ ...waForm, account_sid: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Twilio Auth Token
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Auth Token"
+                    value={waForm.auth_token}
+                    onChange={(e) => setWaForm({ ...waForm, auth_token: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Twilio Sender (From)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="whatsapp:+14155238886"
+                    value={waForm.from_number}
+                    onChange={(e) => setWaForm({ ...waForm, from_number: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Technician Phone (To)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="whatsapp:+919876543210"
+                    value={waForm.to_number}
+                    onChange={(e) => setWaForm({ ...waForm, to_number: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Twilio Webhook URL (HTTPS Public URL)
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://your-domain.ngrok-free.app/webhooks/whatsapp"
+                  value={waForm.webhook_url}
+                  onChange={(e) => setWaForm({ ...waForm, webhook_url: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Operator API Key (FACTORY_API_KEY)
+                </label>
+                <input
+                  type="text"
+                  placeholder="demo-operator-key (or leave blank to auto-generate)"
+                  value={waForm.api_key}
+                  onChange={(e) => setWaForm({ ...waForm, api_key: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200 text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                <a
+                  href="https://www.twilio.com/docs/whatsapp/sandbox"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-cyan-400 hover:underline flex items-center space-x-1"
+                >
+                  <span>Twilio Docs</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowWhatsAppModal(false)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white text-xs transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold shadow-md text-xs transition"
+                  >
+                    Save &amp; Activate
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

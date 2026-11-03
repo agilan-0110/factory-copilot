@@ -20,7 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def create_app(db_path=None):
     path = Path(db_path or os.environ.get("FACTORY_DB_PATH", ROOT / "runtime/factory.db"))
-    settings = messaging.config()
+    def get_settings():
+        return messaging.config()
+
+    settings = get_settings()
     predictor = Predictor(os.environ.get('FACTORY_MODEL_DIR', ROOT / 'ml/artifacts'))
     explainer = ModelExplainer(predictor)
     fleet = IndustrialFleet()
@@ -36,7 +39,7 @@ def create_app(db_path=None):
     def operator(request: Request):
         if request.method == "OPTIONS":
             return
-        key = settings['FACTORY_API_KEY']
+        key = get_settings()['FACTORY_API_KEY']
         if key:
             if not hmac.compare_digest(request.headers.get('X-API-Key', ''), key):
                 raise HTTPException(401, 'Operator API key required.')
@@ -112,7 +115,7 @@ def create_app(db_path=None):
     @app.get("/health")
     def health():
         return {"status": "ok", "stage": 5, "model_ready": predictor.bundle is not None,
-                "messaging": "configured" if messaging.ready(settings) else "disabled"}
+                "messaging": "configured" if messaging.ready(get_settings()) else "disabled"}
 
     @app.get("/profile", dependencies=[Depends(operator)])
     def profile():
@@ -120,7 +123,7 @@ def create_app(db_path=None):
         if predictor.bundle:
             result.update(model_id=predictor.bundle['version'], alert_threshold=predictor.bundle['threshold'],
                           dataset='AI4I 2020 public mirror; synthetic benchmark')
-        result.update(messaging_mode='configured' if messaging.ready(settings) else 'disabled',
+        result.update(messaging_mode='configured' if messaging.ready(get_settings()) else 'disabled',
             replay_cooldown_seconds=300, guidance_sources=['UCI AI4I', 'Haas educational references'])
         return result
 
@@ -210,10 +213,60 @@ def create_app(db_path=None):
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
 
+    @app.get('/whatsapp/status', dependencies=[Depends(operator)])
+    def whatsapp_status():
+        s = get_settings()
+        is_ready = messaging.ready(s)
+        missing = [k for k, v in s.items() if not v]
+        return {
+            'ready': is_ready,
+            'account_sid': (s['TWILIO_ACCOUNT_SID'][:6] + '...') if s['TWILIO_ACCOUNT_SID'] else '',
+            'auth_token_set': bool(s['TWILIO_AUTH_TOKEN']),
+            'from_number': s['TWILIO_WHATSAPP_FROM'],
+            'to_number': s['DEMO_WHATSAPP_TO'],
+            'webhook_url': s['TWILIO_WEBHOOK_URL'],
+            'factory_api_key_set': bool(s['FACTORY_API_KEY']),
+            'missing': missing
+        }
+
+    @app.post('/whatsapp/config', dependencies=[Depends(operator)])
+    async def save_whatsapp_config(request: Request):
+        body = await request.json()
+        env_path = ROOT / '.env'
+        current = get_settings()
+        if body.get('account_sid'): current['TWILIO_ACCOUNT_SID'] = body['account_sid'].strip()
+        if body.get('auth_token'): current['TWILIO_AUTH_TOKEN'] = body['auth_token'].strip()
+        if body.get('from_number'): current['TWILIO_WHATSAPP_FROM'] = body['from_number'].strip()
+        if body.get('to_number'): current['DEMO_WHATSAPP_TO'] = body['to_number'].strip()
+        if body.get('webhook_url'): current['TWILIO_WEBHOOK_URL'] = body['webhook_url'].strip()
+        if body.get('api_key'): current['FACTORY_API_KEY'] = body['api_key'].strip()
+
+        lines = [
+            "# Factory Copilot Environment Configuration",
+            f"TWILIO_ACCOUNT_SID={current['TWILIO_ACCOUNT_SID']}",
+            f"TWILIO_AUTH_TOKEN={current['TWILIO_AUTH_TOKEN']}",
+            f"TWILIO_WHATSAPP_FROM={current['TWILIO_WHATSAPP_FROM']}",
+            f"DEMO_WHATSAPP_TO={current['DEMO_WHATSAPP_TO']}",
+            f"TWILIO_WEBHOOK_URL={current['TWILIO_WEBHOOK_URL']}",
+            f"FACTORY_API_KEY={current['FACTORY_API_KEY']}",
+        ]
+        env_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return whatsapp_status()
+
+    @app.post('/whatsapp/test-send', dependencies=[Depends(operator)])
+    def test_whatsapp_send():
+        s = get_settings()
+        if not messaging.ready(s):
+            raise HTTPException(400, 'WhatsApp is not fully configured yet. Please check all fields.')
+        try:
+            return messaging.test_send(s)
+        except Exception as error:
+            raise HTTPException(502, f'Twilio test send failed: {str(error)}')
+
     @app.post('/incidents/{incident_id}/notify', dependencies=[Depends(operator)])
     def notify(incident_id: str):
         try:
-            return messaging.send(path, incident_id, settings)
+            return messaging.send(path, incident_id, get_settings())
         except LookupError as error:
             raise HTTPException(404, str(error)) from error
         except ValueError as error:
@@ -224,7 +277,7 @@ def create_app(db_path=None):
     @app.post('/incidents/{incident_id}/refresh-delivery', dependencies=[Depends(operator)])
     def refresh_delivery(incident_id: str):
         try:
-            return messaging.refresh_delivery(path, incident_id, settings)
+            return messaging.refresh_delivery(path, incident_id, get_settings())
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
         except (RuntimeError, ImportError) as error:
@@ -232,7 +285,8 @@ def create_app(db_path=None):
 
     @app.post('/webhooks/whatsapp')
     async def whatsapp(request: Request):
-        if not messaging.ready(settings):
+        s = get_settings()
+        if not messaging.ready(s):
             raise HTTPException(503, 'WhatsApp disabled.')
         if request.headers.get('content-type', '').split(';')[0] != 'application/x-www-form-urlencoded':
             raise HTTPException(415, 'Expected form encoded webhook.')
@@ -249,10 +303,10 @@ def create_app(db_path=None):
             raise HTTPException(400, 'Repeated form fields are unsupported.')
         params = {k: v[0] for k, v in values.items()}
         from twilio.request_validator import RequestValidator
-        if not RequestValidator(settings['TWILIO_AUTH_TOKEN']).validate(
-                settings['TWILIO_WEBHOOK_URL'], params, request.headers.get('X-Twilio-Signature', '')):
+        if not RequestValidator(s['TWILIO_AUTH_TOKEN']).validate(
+                s['TWILIO_WEBHOOK_URL'], params, request.headers.get('X-Twilio-Signature', '')):
             raise HTTPException(403, 'Invalid webhook signature.')
-        if params.get('From') != settings['DEMO_WHATSAPP_TO'] or params.get('To') != settings['TWILIO_WHATSAPP_FROM'] or params.get('AccountSid') != settings['TWILIO_ACCOUNT_SID']:
+        if params.get('From') != s['DEMO_WHATSAPP_TO'] or params.get('To') != s['TWILIO_WHATSAPP_FROM'] or params.get('AccountSid') != s['TWILIO_ACCOUNT_SID']:
             raise HTTPException(403, 'Unapproved sender, destination or account.')
         match = re.fullmatch(r'(A[0-9A-F]{12})\s+([1-5])', params.get('Body', '').strip())
         sid = params.get('MessageSid', '')
